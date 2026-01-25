@@ -36,12 +36,32 @@ const levelColors: Record<string, string> = {
   warn: "text-warning",
 };
 
+const generationLogs = [
+  { time: "14:30:12.100", level: "info", message: "Starting formal specification generation..." },
+  { time: "14:30:12.234", level: "info", message: "Parsing requirements.md (2.4KB)" },
+  { time: "14:30:12.456", level: "info", message: "Extracting formal requirements: 3 functional groups found" },
+  { time: "14:30:12.678", level: "debug", message: "FR-1: Transfer Operations (3 requirements)" },
+  { time: "14:30:12.789", level: "debug", message: "FR-2: Approval Mechanism (3 requirements)" },
+  { time: "14:30:12.890", level: "debug", message: "FR-3: TransferFrom Operations (3 requirements)" },
+  { time: "14:30:13.012", level: "info", message: "Extracting security invariants: 3 invariants found" },
+  { time: "14:30:13.234", level: "warn", message: "SI-1 marked as Critical — will generate P0 assertion" },
+  { time: "14:30:13.456", level: "info", message: "Generating Dafny module structure..." },
+  { time: "14:30:13.789", level: "success", message: "✓ Generated: TokenState datatype" },
+  { time: "14:30:14.012", level: "success", message: "✓ Generated: ValidState predicate" },
+  { time: "14:30:14.234", level: "success", message: "✓ Generated: Transfer method with pre/postconditions" },
+  { time: "14:30:14.456", level: "success", message: "✓ Generated: TransferPreservesTotalSupply lemma" },
+  { time: "14:30:14.567", level: "info", message: "Specification generation complete. Output: spec.dfy" },
+  { time: "14:30:14.678", level: "info", message: "Navigating to formal specification..." },
+];
+
 interface TerminalPanelProps {
   isCollapsed: boolean;
   onToggle: () => void;
+  isGenerating?: boolean;
 }
 
-export function TerminalPanel({ isCollapsed, onToggle }: TerminalPanelProps) {
+export function TerminalPanel({ isCollapsed, onToggle, isGenerating }: TerminalPanelProps) {
+  const logs = isGenerating ? generationLogs : logEntries;
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -75,7 +95,7 @@ export function TerminalPanel({ isCollapsed, onToggle }: TerminalPanelProps) {
       {/* Log Content */}
       {!isCollapsed && (
         <div ref={scrollRef} className="flex-1 overflow-auto p-2 font-mono text-xs">
-          {logEntries.map((entry, i) => (
+          {logs.map((entry, i) => (
             <div key={i} className="flex gap-2 leading-5">
               <span className="shrink-0 text-muted-foreground/50">[{entry.time}]</span>
               <span className={levelColors[entry.level]}>{entry.message}</span>

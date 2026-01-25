@@ -69,8 +69,12 @@ module TokenApproval {
 
 const codeLines = dafnyCode.split("\n");
 
-export function CodeEditor() {
-  const [activeTab, setActiveTab] = useState("Spec.dfy");
+interface CodeEditorProps {
+  selectedFile?: string;
+}
+
+export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
+  const [activeTab, setActiveTab] = useState(selectedFile === "utils.dfy" ? "Utils.dfy" : "Spec.dfy");
 
   return (
     <div className="flex h-full flex-col bg-background">
