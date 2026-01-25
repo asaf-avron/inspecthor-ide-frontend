@@ -1,0 +1,14 @@
+# Frontend .dockerignore
+node_modules
+.next
+.git
+.env*
+! .env.production
+npm-debug.log
+yarn-error.log
+.DS_Store
+coverage
+*.test.ts
+*.spec.ts
+e2e
+tests
