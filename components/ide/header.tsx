@@ -13,9 +13,10 @@ import {
 interface HeaderProps {
   onRunVerification: () => void;
   isVerifying: boolean;
+  showVerification?: boolean;
 }
 
-export function Header({ onRunVerification, isVerifying }: HeaderProps) {
+export function Header({ onRunVerification, isVerifying, showVerification = true }: HeaderProps) {
   return (
     <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-4">
       {/* Left: Logo */}
@@ -99,15 +100,17 @@ export function Header({ onRunVerification, isVerifying }: HeaderProps) {
           <span className="hidden sm:inline">Connect Wallet</span>
         </Button>
 
-        <Button
-          onClick={onRunVerification}
-          disabled={isVerifying}
-          size="sm"
-          className="h-7 gap-1.5 bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Play className={`h-3.5 w-3.5 ${isVerifying ? "animate-pulse" : ""}`} />
-          <span>{isVerifying ? "Verifying..." : "Run Verification"}</span>
-        </Button>
+        {showVerification && (
+          <Button
+            onClick={onRunVerification}
+            disabled={isVerifying}
+            size="sm"
+            className="h-7 gap-1.5 bg-primary px-3 text-xs font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Play className={`h-3.5 w-3.5 ${isVerifying ? "animate-pulse" : ""}`} />
+            <span>{isVerifying ? "Verifying..." : "Run Verification"}</span>
+          </Button>
+        )}
       </div>
     </header>
   );
