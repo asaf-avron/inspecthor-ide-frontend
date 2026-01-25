@@ -1,6 +1,6 @@
 "use client";
 
-import { FileText, ChevronRight, Sparkles, ArrowRight, Hash, List, CheckSquare } from "lucide-react";
+import { FileText, ChevronRight, Sparkles, ArrowRight, Hash, List, CheckSquare, Layers, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -12,66 +12,18 @@ import {
 interface MarkdownEditorProps {
   onGenerateSpec: () => void;
   isGenerating?: boolean;
+  isRootFile?: boolean;
+  onDeconstructToUnits?: () => void;
+  isDeconstructing?: boolean;
 }
 
-const markdownContent = `# Token Approval Contract Requirements
-
-## Overview
-This document specifies the formal requirements for a secure ERC-20 style token approval system. The specification must be verifiable using Dafny.
-
----
-
-## Functional Requirements
-
-### FR-1: Transfer Operations
-- **FR-1.1**: Users MUST be able to transfer tokens from their own balance to another address
-- **FR-1.2**: Transfers MUST fail if the sender has insufficient balance
-- **FR-1.3**: Transfers to the zero address MUST be prohibited
-
-### FR-2: Approval Mechanism  
-- **FR-2.1**: Token holders MUST be able to approve third parties to spend on their behalf
-- **FR-2.2**: Approved spending MUST be limited to the approved amount
-- **FR-2.3**: Multiple approvals for different spenders MUST be independent
-
-### FR-3: TransferFrom Operations
-- **FR-3.1**: Approved spenders MUST be able to transfer tokens within their allowance
-- **FR-3.2**: TransferFrom MUST decrement the allowance by the transferred amount
-- **FR-3.3**: TransferFrom MUST fail if allowance is exceeded
-
----
-
-## Security Invariants
-
-### SI-1: Conservation of Tokens
-> **Critical**: The total supply of tokens MUST remain constant across all operations.
-> 
-> $$\\sum_{addr} balance[addr] = totalSupply$$
-
-### SI-2: No Negative Balances
-All balances MUST be non-negative at all times.
-
-### SI-3: No Overflow
-All arithmetic operations MUST be checked for overflow conditions.
-
----
-
-## Formal Properties
-
-| Property | Description | Priority |
-|----------|-------------|----------|
-| \`TotalSupplyConservation\` | Sum of balances equals total supply | P0 |
-| \`NoNegativeBalance\` | All balances >= 0 | P0 |
-| \`AllowanceRespected\` | TransferFrom <= allowance | P1 |
-| \`TransferDecrementsSource\` | Sender balance decreases by exact amount | P1 |
-
----
-
-## Notes
-- This specification will be translated to Dafny formal verification code
-- All properties marked P0 are **blocking** for deployment
-- See \`spec.dfy\` for the formal implementation`;
-
-export function MarkdownEditor({ onGenerateSpec, isGenerating }: MarkdownEditorProps) {
+export function MarkdownEditor({ 
+  onGenerateSpec, 
+  isGenerating,
+  isRootFile = true,
+  onDeconstructToUnits,
+  isDeconstructing,
+}: MarkdownEditorProps) {
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Tab Bar */}
@@ -79,7 +31,12 @@ export function MarkdownEditor({ onGenerateSpec, isGenerating }: MarkdownEditorP
         <div className="flex items-center">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
             <FileText className="h-3.5 w-3.5 text-blue-400" />
-            <span>requirements.md</span>
+            <span>Requirements.md</span>
+            {isRootFile && (
+              <span className="ml-1 rounded bg-yellow-500/20 px-1 py-0.5 text-[10px] font-medium text-yellow-500">
+                Root
+              </span>
+            )}
           </div>
         </div>
         
@@ -92,7 +49,7 @@ export function MarkdownEditor({ onGenerateSpec, isGenerating }: MarkdownEditorP
                   onClick={onGenerateSpec}
                   disabled={isGenerating}
                   size="sm"
-                  className="h-7 gap-1.5 bg-gradient-to-r from-violet-500 to-primary px-3 text-xs font-medium text-white hover:from-violet-500/90 hover:to-primary/90"
+                  className="h-7 gap-1.5 bg-gradient-to-r from-violet-500 to-primary px-3 text-xs font-medium text-foreground hover:from-violet-500/90 hover:to-primary/90"
                 >
                   <Sparkles className={`h-3.5 w-3.5 ${isGenerating ? "animate-pulse" : ""}`} />
                   <span>{isGenerating ? "Generating..." : "Generate Formal Spec"}</span>
@@ -109,10 +66,32 @@ export function MarkdownEditor({ onGenerateSpec, isGenerating }: MarkdownEditorP
 
       {/* Breadcrumb */}
       <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
-        <span>contracts</span>
+        <span>Root Spec</span>
         <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">requirements.md</span>
+        <span className="text-foreground">Requirements.md</span>
       </div>
+
+      {/* Deconstruction Action Bar (for Root MD files in Edit mode) */}
+      {isRootFile && onDeconstructToUnits && (
+        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-violet-500/10 to-primary/10 px-4 py-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <span className="text-xs text-muted-foreground">
+              This is a root specification file. Break it down into provable units for verification.
+            </span>
+          </div>
+          <Button
+            onClick={onDeconstructToUnits}
+            disabled={isDeconstructing}
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 border-violet-500/50 bg-violet-500/20 px-3 text-xs font-medium text-violet-300 hover:bg-violet-500/30 hover:text-violet-200"
+          >
+            <Layers className={`h-3.5 w-3.5 ${isDeconstructing ? "animate-pulse" : ""}`} />
+            <span>{isDeconstructing ? "Deconstructing..." : "Deconstruct to Units"}</span>
+          </Button>
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="flex h-8 items-center gap-1 border-b border-border bg-secondary/10 px-3">
@@ -126,7 +105,7 @@ export function MarkdownEditor({ onGenerateSpec, isGenerating }: MarkdownEditorP
           <CheckSquare className="h-3.5 w-3.5" />
         </button>
         <div className="mx-2 h-4 w-px bg-border" />
-        <span className="text-[10px] text-muted-foreground">Markdown Preview</span>
+        <span className="text-[10px] text-muted-foreground">Edit Mode</span>
       </div>
 
       {/* Markdown Content */}
@@ -303,9 +282,9 @@ export function MarkdownEditor({ onGenerateSpec, isGenerating }: MarkdownEditorP
             <section className="rounded-lg border border-border bg-secondary/20 p-4">
               <h3 className="mb-2 text-sm font-medium text-foreground">Notes</h3>
               <ul className="space-y-1 text-xs text-muted-foreground">
-                <li>• This specification will be translated to Dafny formal verification code</li>
-                <li>• All properties marked P0 are <strong className="text-destructive">blocking</strong> for deployment</li>
-                <li>• See <code className="rounded bg-background px-1 py-0.5 text-primary">spec.dfy</code> for the formal implementation</li>
+                <li>This specification will be translated to Dafny formal verification code</li>
+                <li>All properties marked P0 are <strong className="text-destructive">blocking</strong> for deployment</li>
+                <li>See <code className="rounded bg-background px-1 py-0.5 text-primary">spec.dfy</code> for the formal implementation</li>
               </ul>
             </section>
           </article>
