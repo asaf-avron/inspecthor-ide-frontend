@@ -3,55 +3,51 @@
  * Handles all communication with the FastAPI backend
  */
 
+import type {
+    HealthResponse,
+    GenerateSpecResponse,
+    ChatRequest,
+    ChatResponse,
+    ChatContext,
+    ChatMessage,
+    FileSaveRequest,
+    FileSaveResponse,
+    FileResponse,
+    FileListResponse,
+    FileDeleteResponse,
+    VerifyRequest,
+    VerifyResponse,
+    RigorLevel,
+} from './types';
+
+// Re-export types for convenience
+export type {
+    HealthResponse,
+    GenerateSpecResponse,
+    ChatRequest,
+    ChatResponse,
+    ChatContext,
+    ChatMessage,
+    FileSaveRequest,
+    FileSaveResponse,
+    FileResponse,
+    FileListResponse,
+    FileDeleteResponse,
+    VerifyRequest,
+    VerifyResponse,
+    Gap,
+    Ambiguity,
+    TraceabilityEntry,
+    SpecStatistics,
+    ProofObligation,
+    VerificationResult,
+    VerificationError,
+    LogEntry,
+} from './types';
+
 // API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_KEY = process.env.GUARDIAN_API_KEY || '';
-
-// Type Definitions
-export interface HealthResponse {
-    status: string;
-    gemini_configured: boolean;
-    dafny_available: boolean;
-}
-
-export interface GenerateSpecRequest {
-    english_spec: string;
-}
-
-export interface Gap {
-    severity: string;
-    description: string;
-    location: string;
-}
-
-export interface TraceabilityEntry {
-    id: string;
-    source_text: string;
-    code_line: string;
-    status: string;
-}
-
-export interface GenerateSpecResponse {
-    triage: {
-        doc_type: string;
-        confidence: number;
-    };
-    structured_spec: string;
-    dafny_skeleton: string;
-    gaps: Gap[];
-    ambiguities: string[];
-    traceability_matrix: TraceabilityEntry[];
-}
-
-export interface ChatRequest {
-    message: string;
-    context?: string;
-}
-
-export interface ChatResponse {
-    content: string;
-    suggestions: string[];
-}
+const API_KEY = process.env.NEXT_PUBLIC_GUARDIAN_API_KEY || '';
 
 export class APIError extends Error {
     constructor(
@@ -125,11 +121,15 @@ export async function checkHealth(): Promise<HealthResponse> {
  * Generate Dafny specification from English requirements
  */
 export async function generateSpec(
-    englishSpec: string
+    englishSpec: string,
+    rigorLevel: RigorLevel = 'standard'
 ): Promise<GenerateSpecResponse> {
     return apiFetch<GenerateSpecResponse>('/api/generate/spec', {
         method: 'POST',
-        body: JSON.stringify({ english_spec: englishSpec }),
+        body: JSON.stringify({ 
+            english_spec: englishSpec,
+            rigor_level: rigorLevel,
+        }),
     });
 }
 
@@ -138,11 +138,73 @@ export async function generateSpec(
  */
 export async function chatWithAssistant(
     message: string,
-    context?: string
+    context?: ChatContext,
+    history?: ChatMessage[]
 ): Promise<ChatResponse> {
     return apiFetch<ChatResponse>('/api/assistant/chat', {
         method: 'POST',
-        body: JSON.stringify({ message, context }),
+        body: JSON.stringify({ message, context, history }),
+    });
+}
+
+// === File Management APIs ===
+
+/**
+ * Save a file to the backend
+ */
+export async function saveFile(
+    request: FileSaveRequest
+): Promise<FileSaveResponse> {
+    return apiFetch<FileSaveResponse>('/api/files/save', {
+        method: 'POST',
+        body: JSON.stringify(request),
+    });
+}
+
+/**
+ * Get a file by ID
+ */
+export async function getFile(fileId: string): Promise<FileResponse> {
+    return apiFetch<FileResponse>(`/api/files/${fileId}`);
+}
+
+/**
+ * List all files, optionally filtered by project or type
+ */
+export async function listFiles(
+    projectId?: string,
+    fileType?: string
+): Promise<FileListResponse> {
+    const params = new URLSearchParams();
+    if (projectId) params.append('project_id', projectId);
+    if (fileType) params.append('file_type', fileType);
+    
+    const queryString = params.toString();
+    const endpoint = queryString ? `/api/files?${queryString}` : '/api/files';
+    
+    return apiFetch<FileListResponse>(endpoint);
+}
+
+/**
+ * Delete a file by ID
+ */
+export async function deleteFile(fileId: string): Promise<FileDeleteResponse> {
+    return apiFetch<FileDeleteResponse>(`/api/files/${fileId}`, {
+        method: 'DELETE',
+    });
+}
+
+// === Verification APIs ===
+
+/**
+ * Verify Dafny code
+ */
+export async function verifyDafny(
+    request: VerifyRequest
+): Promise<VerifyResponse> {
+    return apiFetch<VerifyResponse>('/api/verify', {
+        method: 'POST',
+        body: JSON.stringify(request),
     });
 }
 
@@ -184,9 +246,20 @@ export async function withRetry<T>(
 
 // Export configured API client
 export const apiClient = {
+    // Health
     checkHealth,
+    // Generation
     generateSpec,
+    // Chat
     chatWithAssistant,
+    // Files
+    saveFile,
+    getFile,
+    listFiles,
+    deleteFile,
+    // Verification
+    verifyDafny,
+    // Utilities
     withRetry,
 };
 

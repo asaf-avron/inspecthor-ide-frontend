@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   ChevronRight,
   ChevronDown,
@@ -22,19 +22,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useProject } from "@/lib/project-context";
+import type { ProjectFileItem, ProjectVerificationStatus, ProjectFileType } from "@/lib/types";
 
-export type FileType = "md" | "dfy" | "folder" | "unit";
-
-export type VerificationStatus = "verified" | "failed" | "pending" | "none";
-
-export interface FileItem {
-  id: string;
-  name: string;
-  type: FileType;
-  linkedDfy?: string;
-  verificationStatus?: VerificationStatus;
-  children?: FileItem[];
-}
+export type FileType = ProjectFileType;
+export type VerificationStatus = ProjectVerificationStatus;
+export type FileItem = ProjectFileItem;
 
 interface ProjectExplorerProps {
   selectedFile: string;
@@ -44,8 +37,8 @@ interface ProjectExplorerProps {
   hasProject: boolean;
 }
 
-// Updated project structure for traceability
-const projectFiles: FileItem[] = [
+// Default project structure when no files exist
+const defaultProjectFiles: FileItem[] = [
   {
     id: "root-spec",
     name: "Root Spec (Project)",
@@ -55,51 +48,6 @@ const projectFiles: FileItem[] = [
         id: "requirements.md", 
         name: "Requirements.md", 
         type: "md",
-      },
-      { 
-        id: "unit-auth", 
-        name: "Unit 1: Auth Logic", 
-        type: "unit",
-        linkedDfy: "Auth.dfy",
-        verificationStatus: "verified",
-        children: [
-          { 
-            id: "auth.dfy", 
-            name: "Auth.dfy", 
-            type: "dfy",
-            verificationStatus: "verified",
-          },
-        ],
-      },
-      { 
-        id: "unit-tx", 
-        name: "Unit 2: Transaction", 
-        type: "unit",
-        linkedDfy: "Tx.dfy",
-        verificationStatus: "failed",
-        children: [
-          { 
-            id: "spec.dfy", 
-            name: "Spec.dfy", 
-            type: "dfy",
-            verificationStatus: "failed",
-          },
-        ],
-      },
-      { 
-        id: "unit-utils", 
-        name: "Unit 3: Utilities", 
-        type: "unit",
-        linkedDfy: "Utils.dfy",
-        verificationStatus: "pending",
-        children: [
-          { 
-            id: "utils.dfy", 
-            name: "Utils.dfy", 
-            type: "dfy",
-            verificationStatus: "pending",
-          },
-        ],
       },
     ],
   },
@@ -118,7 +66,7 @@ function VerificationIcon({ status }: { status?: VerificationStatus }) {
   }
 }
 
-function FileIcon({ type, isActive, linkedDfy }: { type: FileType; isActive?: boolean; linkedDfy?: string }) {
+function FileIcon({ type, isActive }: { type: FileType; isActive?: boolean }) {
   switch (type) {
     case "md":
       return (
@@ -201,7 +149,7 @@ function FileTreeItem({
                 <Folder className="h-4 w-4 shrink-0 text-yellow-500/80" />
               )
             ) : (
-              <FileIcon type={item.type} isActive={isActive} linkedDfy={item.linkedDfy} />
+              <FileIcon type={item.type} isActive={isActive} />
             )}
           </>
         ) : (
@@ -247,6 +195,40 @@ export function ProjectExplorer({
   onToggleCollapse,
   hasProject,
 }: ProjectExplorerProps) {
+  const { state } = useProject();
+
+  // Use project files from context or default
+  const projectFiles = useMemo(() => {
+    if (state.projectFiles.length > 0) {
+      // Update verification status based on verification results
+      return updateVerificationStatus(state.projectFiles, state.verificationResults?.verified);
+    }
+    return defaultProjectFiles;
+  }, [state.projectFiles, state.verificationResults]);
+
+  // Calculate stats
+  const stats = useMemo(() => {
+    let units = 0;
+    let verified = 0;
+    let failed = 0;
+    let pending = 0;
+
+    const countItems = (items: FileItem[]) => {
+      for (const item of items) {
+        if (item.type === 'unit') {
+          units++;
+          if (item.verificationStatus === 'verified') verified++;
+          else if (item.verificationStatus === 'failed') failed++;
+          else if (item.verificationStatus === 'pending') pending++;
+        }
+        if (item.children) countItems(item.children);
+      }
+    };
+
+    countItems(projectFiles);
+    return { units, verified, failed, pending };
+  }, [projectFiles]);
+
   if (!hasProject) {
     return null;
   }
@@ -277,7 +259,7 @@ export function ProjectExplorer({
                   onClick={() => onFileSelect("requirements.md")}
                   className={cn(
                     "flex h-8 w-8 items-center justify-center rounded transition-colors",
-                    selectedFile === "requirements.md"
+                    selectedFile === "requirements.md" || selectedFile.endsWith(".md")
                       ? "bg-accent text-blue-400"
                       : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                   )}
@@ -289,48 +271,35 @@ export function ProjectExplorer({
                 <p>Requirements.md</p>
               </TooltipContent>
             </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onFileSelect("spec.dfy")}
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded transition-colors",
-                    selectedFile === "spec.dfy"
-                      ? "bg-accent text-primary"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <Shield className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <div className="flex items-center gap-2">
-                  <span>Spec.dfy</span>
-                  <XCircle className="h-3 w-3 text-destructive" />
-                </div>
-              </TooltipContent>
-            </Tooltip>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <button
-                  onClick={() => onFileSelect("auth.dfy")}
-                  className={cn(
-                    "flex h-8 w-8 items-center justify-center rounded transition-colors",
-                    selectedFile === "auth.dfy"
-                      ? "bg-accent text-primary"
-                      : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                  )}
-                >
-                  <Shield className="h-4 w-4" />
-                </button>
-              </TooltipTrigger>
-              <TooltipContent side="right">
-                <div className="flex items-center gap-2">
-                  <span>Auth.dfy</span>
-                  <CheckCircle2 className="h-3 w-3 text-primary" />
-                </div>
-              </TooltipContent>
-            </Tooltip>
+            {state.dafnyCode && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => onFileSelect("spec.dfy")}
+                    className={cn(
+                      "flex h-8 w-8 items-center justify-center rounded transition-colors",
+                      selectedFile === "spec.dfy" || selectedFile.endsWith(".dfy")
+                        ? "bg-accent text-primary"
+                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                    )}
+                  >
+                    <Shield className="h-4 w-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <div className="flex items-center gap-2">
+                    <span>Spec.dfy</span>
+                    {state.verificationResults?.verified ? (
+                      <CheckCircle2 className="h-3 w-3 text-primary" />
+                    ) : state.verificationResults?.verified === false ? (
+                      <XCircle className="h-3 w-3 text-destructive" />
+                    ) : (
+                      <Loader2 className="h-3 w-3 text-warning" />
+                    )}
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            )}
           </div>
         </div>
       </TooltipProvider>
@@ -392,9 +361,30 @@ export function ProjectExplorer({
       {/* Footer */}
       <div className="border-t border-border px-3 py-2">
         <p className="text-[10px] text-muted-foreground/70">
-          3 units | 1 verified | 1 failed
+          {stats.units > 0 
+            ? `${stats.units} units | ${stats.verified} verified | ${stats.failed} failed`
+            : state.dafnyCode ? '1 spec file' : 'No spec generated yet'
+          }
         </p>
       </div>
     </div>
   );
+}
+
+// Helper function to update verification status in project files
+function updateVerificationStatus(files: FileItem[], verified?: boolean): FileItem[] {
+  return files.map(file => {
+    const newFile = { ...file };
+    
+    // Update dfy files based on verification
+    if (file.type === 'dfy' && verified !== undefined) {
+      newFile.verificationStatus = verified ? 'verified' : 'failed';
+    }
+    
+    if (file.children) {
+      newFile.children = updateVerificationStatus(file.children, verified);
+    }
+    
+    return newFile;
+  });
 }

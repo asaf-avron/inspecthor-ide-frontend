@@ -1,49 +1,104 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
-import { Sparkles, Send, User, ChevronDown, Lightbulb, Code2 } from "lucide-react";
+import React, { useState, useEffect, useMemo } from "react";
+import { Sparkles, Send, User, ChevronDown, Lightbulb, Code2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useProject } from "@/lib/project-context";
+import type { ChatMessage } from "@/lib/types";
 
-interface Message {
+interface Message extends ChatMessage {
   id: string;
-  role: "user" | "assistant";
-  content: string;
   suggestions?: string[];
 }
 
-const initialMessages: Message[] = [
-  {
-    id: "1",
-    role: "assistant",
-    content: `I've analyzed the verification failure at **Spec.dfy:28**.
-
-**Issue:** The postcondition \`ValidState(newState)\` cannot be verified because the solver found a potential counterexample.
-
-**Root Cause:** When the \`to\` address is not present in the original \`balances\` map, the \`GetOrDefault\` call returns 0, but the verification cannot establish that adding a new entry preserves the invariant \`SumBalances(balances) == totalSupply\`.
-
-**Why it fails:** The \`SumBalances\` function iterates over map keys. When you add a new key-value pair, you need to explicitly prove that:
-1. The new key wasn't counted before
-2. The sum increases exactly by the new value
-
-**Suggested fix:** Add a helper lemma that establishes the relationship between \`SumBalances\` and map updates:`,
-    suggestions: [
-      "Show me the suggested lemma code",
-      "Explain SumBalances in more detail",
-      "What are other ways to fix this?",
-    ],
-  },
-];
-
 export function GeminiInsightPanel() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const { state, sendChatMessage } = useProject();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Build context from verification errors
+  const verificationContext = useMemo(() => {
+    if (!state.verificationResults?.errors?.length) return null;
+    
+    const firstError = state.verificationResults.errors[0];
+    return {
+      code: state.dafnyCode.split('\n').slice(
+        Math.max(0, firstError.line - 5),
+        firstError.line + 5
+      ).join('\n'),
+      location: `Line ${firstError.line}:${firstError.column}`,
+      error: firstError.message,
+    };
+  }, [state.verificationResults, state.dafnyCode]);
+
+  // Generate initial message based on verification results
+  useEffect(() => {
+    if (state.verificationResults && messages.length === 0) {
+      const errors = state.verificationResults.errors;
+      
+      if (errors && errors.length > 0) {
+        const initialMessage: Message = {
+          id: 'initial',
+          role: 'assistant',
+          content: `I've detected **${errors.length} verification error${errors.length > 1 ? 's' : ''}** in your specification.
+
+**First error at line ${errors[0].line}:**
+\`${errors[0].message}\`
+
+I can help you understand and fix these issues. What would you like to know?`,
+          suggestions: [
+            "Explain this error",
+            "How do I fix this?",
+            "Show related proof obligations",
+          ],
+        };
+        setMessages([initialMessage]);
+      } else if (state.verificationResults.verified) {
+        const successMessage: Message = {
+          id: 'initial',
+          role: 'assistant',
+          content: `Great news! All verification checks passed in **${state.verificationResults.verification_time_ms}ms**.
+
+Your specification is formally verified. Would you like me to explain any of the proof obligations or help you extend the specification?`,
+          suggestions: [
+            "Explain the proof strategy",
+            "How can I add more properties?",
+            "What are the verified invariants?",
+          ],
+        };
+        setMessages([successMessage]);
+      }
+    }
+  }, [state.verificationResults, messages.length]);
+
+  // Show welcome message if no verification yet
+  useEffect(() => {
+    if (!state.verificationResults && messages.length === 0 && state.hasProject) {
+      setMessages([{
+        id: 'welcome',
+        role: 'assistant',
+        content: `Hello! I'm your verification assistant powered by Gemini AI.
+
+I can help you:
+- **Debug** verification failures
+- **Explain** proof obligations
+- **Suggest** fixes for specification gaps
+- **Answer** questions about Dafny and formal verification
+
+Run verification on your Dafny code, and I'll automatically analyze any errors.`,
+        suggestions: [
+          "How does formal verification work?",
+          "Explain Dafny syntax",
+          "What are common verification errors?",
+        ],
+      }]);
+    }
+  }, [state.hasProject, state.verificationResults, messages.length]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isThinking) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -55,36 +110,36 @@ export function GeminiInsightPanel() {
     setInput("");
     setIsThinking(true);
 
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
+    try {
+      const response = await sendChatMessage(input, verificationContext || undefined);
+      
+      if (response) {
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: response.content,
+          suggestions: response.suggestions.length > 0 ? response.suggestions : undefined,
+        };
+        setMessages((prev) => [...prev, aiResponse]);
+      } else {
+        // Error response already added by context
+        const errorResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "I apologize, but I encountered an error processing your request. Please try again.",
+        };
+        setMessages((prev) => [...prev, errorResponse]);
+      }
+    } catch (error) {
+      const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: "assistant",
-        content: `Here's the helper lemma you need to add:
-
-\`\`\`dafny
-lemma SumBalancesUpdate(
-  m: map<address, uint256>, 
-  key: address, 
-  oldVal: uint256, 
-  newVal: uint256
-)
-  requires key in m
-  requires m[key] == oldVal
-  ensures SumBalances(m[key := newVal]) == 
-    SumBalances(m) - oldVal + newVal
-\`\`\`
-
-This lemma explicitly states how \`SumBalances\` changes when you update a single entry. You'll also need a similar lemma for inserting new keys.`,
-        suggestions: [
-          "Generate the insert lemma too",
-          "How do I apply this lemma?",
-          "Run verification again",
-        ],
+        content: `Error: ${error instanceof Error ? error.message : 'Unknown error occurred'}`,
       };
-      setMessages((prev) => [...prev, aiResponse]);
+      setMessages((prev) => [...prev, errorResponse]);
+    } finally {
       setIsThinking(false);
-    }, 1500);
+    }
   };
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -99,21 +154,31 @@ This lemma explicitly states how \`SumBalances\` changes when you update a singl
           <Sparkles className="h-4 w-4 text-primary" />
           <span className="text-sm font-medium text-foreground">Verification Assistant</span>
         </div>
-        <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs text-muted-foreground">
-          <span>claude-4-opus</span>
-          <ChevronDown className="h-3 w-3" />
-        </Button>
+        <div className="flex items-center gap-2">
+          {!state.geminiConfigured && (
+            <div className="flex items-center gap-1 text-xs text-warning">
+              <AlertCircle className="h-3 w-3" />
+              <span>Gemini not configured</span>
+            </div>
+          )}
+          <Button variant="ghost" size="sm" className="h-6 gap-1 px-2 text-xs text-muted-foreground">
+            <span>gemini-2.0-flash</span>
+            <ChevronDown className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
 
       {/* Context Badge */}
-      <div className="border-b border-border bg-secondary/30 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Context:</span>
-          <span className="rounded bg-destructive/20 px-1.5 py-0.5 font-mono text-destructive">
-            Transfer: postcondition ValidState @ Spec.dfy:28
-          </span>
+      {verificationContext && (
+        <div className="border-b border-border bg-secondary/30 px-3 py-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-muted-foreground">Context:</span>
+            <span className="rounded bg-destructive/20 px-1.5 py-0.5 font-mono text-destructive">
+              {verificationContext.location}: {verificationContext.error.slice(0, 50)}...
+            </span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-auto p-3">
@@ -176,7 +241,7 @@ This lemma explicitly states how \`SumBalances\` changes when you update a singl
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask about the verification failure..."
+            placeholder="Ask about verification, Dafny, or your specification..."
             className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
           <Button
@@ -202,14 +267,16 @@ function MessageContent({ content }: { content: string }) {
     <>
       {parts.map((part, i) => {
         if (part.startsWith("```")) {
-          const code = part.replace(/```\w*\n?/g, "").replace(/```$/g, "");
+          const match = part.match(/```(\w*)\n?([\s\S]*?)```/);
+          const language = match?.[1] || 'dafny';
+          const code = match?.[2] || part.replace(/```\w*\n?/g, "").replace(/```$/g, "");
           return (
             <div key={i} className="my-2 rounded border border-border bg-secondary/50 p-3">
               <div className="flex items-center gap-1.5 pb-2 text-xs text-muted-foreground">
                 <Code2 className="h-3 w-3" />
-                <span>dafny</span>
+                <span>{language}</span>
               </div>
-              <pre className="overflow-x-auto font-mono text-xs text-foreground">{code}</pre>
+              <pre className="overflow-x-auto font-mono text-xs text-foreground">{code.trim()}</pre>
             </div>
           );
         }
