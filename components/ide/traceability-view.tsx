@@ -1,146 +1,21 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { FileText, ChevronRight, GripVertical, Eye, Bookmark } from "lucide-react";
+import { useMemo } from "react";
+import { FileText, ChevronRight, GripVertical, Eye, Bookmark, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useProject } from "@/lib/project-context";
+import type { ReferenceMapping } from "@/lib/types";
 
 interface TraceabilityViewProps {
   selectedFile: string;
   activeReference: string | null;
   onReferenceClick: (refId: string | null) => void;
 }
-
-interface ReferenceMapping {
-  id: string;
-  markdownText: string;
-  dafnyLines: { start: number; end: number };
-  dafnyCode: string;
-}
-
-const referenceMappings: ReferenceMapping[] = [
-  {
-    id: "Ref-1",
-    markdownText: "Users MUST be able to transfer tokens from their own balance",
-    dafnyLines: { start: 21, end: 35 },
-    dafnyCode: `method Transfer(
-    from: address, 
-    to: address, 
-    amount: uint256
-  ) returns (newState: TokenState)
-    requires ValidState(state)
-    requires from in state.balances
-    requires state.balances[from] >= amount
-    ensures ValidState(newState)`,
-  },
-  {
-    id: "Ref-2",
-    markdownText: "Total supply of tokens MUST remain constant",
-    dafnyLines: { start: 38, end: 52 },
-    dafnyCode: `lemma TransferPreservesTotalSupply(
-    s: TokenState, 
-    from: address, 
-    to: address, 
-    amount: uint256
-  )
-    requires ValidState(s)
-    ensures SumBalances(...) == s.totalSupply`,
-  },
-  {
-    id: "Ref-3",
-    markdownText: "All balances MUST be non-negative at all times",
-    dafnyLines: { start: 11, end: 17 },
-    dafnyCode: `predicate ValidState(s: TokenState)
-  {
-    // No negative or overflow values
-    forall addr :: addr in s.balances ==> 
-      0 <= s.balances[addr] <= MAX_UINT256
-  }`,
-  },
-  {
-    id: "Ref-4",
-    markdownText: "Transfers MUST fail if the sender has insufficient balance",
-    dafnyLines: { start: 26, end: 27 },
-    dafnyCode: `requires from in state.balances
-    requires state.balances[from] >= amount`,
-  },
-];
-
-const dafnyCode = `// Spec.dfy - Token Approval Contract Specification
-include "Utils.dfy"
-
-module TokenApproval {
-  datatype TokenState = TokenState(
-    balances: map<address, uint256>,
-    allowances: map<address, map<address, uint256>>,
-    totalSupply: uint256
-  )
-
-  predicate ValidState(s: TokenState)
-  {
-    // Total supply equals sum of all balances
-    SumBalances(s.balances) == s.totalSupply &&
-    // No negative or overflow values
-    forall addr :: addr in s.balances ==> 
-      0 <= s.balances[addr] <= MAX_UINT256
-  }
-
-  method Transfer(
-    from: address, 
-    to: address, 
-    amount: uint256
-  ) returns (newState: TokenState)
-    requires ValidState(state)
-    requires from in state.balances
-    requires state.balances[from] >= amount
-    ensures ValidState(newState)
-    ensures newState.balances[to] == 
-      old(state.balances[to]) + amount
-  {
-    // Implementation verified against spec
-    var fromBalance := state.balances[from];
-    var toBalance := state.balances.GetOrDefault(to, 0);
-    
-    newState := state.(
-      balances := state.balances
-        [from := fromBalance - amount]
-        [to := toBalance + amount]
-    );
-  }
-
-  lemma TransferPreservesTotalSupply(
-    s: TokenState, 
-    from: address, 
-    to: address, 
-    amount: uint256
-  )
-    requires ValidState(s)
-    requires from in s.balances
-    requires s.balances[from] >= amount
-    ensures SumBalances(Transfer(s, from, to, amount).balances) 
-      == s.totalSupply
-  {
-    // Proof: conservation of tokens
-    calc {
-      SumBalances(Transfer(s, from, to, amount).balances);
-      == { SumBalancesAdditive(s.balances, from, to, amount); }
-      SumBalances(s.balances);
-      == s.totalSupply;
-    }
-  }
-}`;
-
-const codeLines = dafnyCode.split("\n");
 
 function ReferenceBadge({ 
   refId, 
@@ -189,12 +64,72 @@ function ReferenceBadge({
   );
 }
 
+function CodeLine({ line }: { line: string }) {
+  const highlightedLine = line
+    .replace(/(\/\/.*$)/g, '<span class="text-muted-foreground/70">$1</span>')
+    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-[#c586c0]">$1</span>')
+    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-[#4ec9b0]">$1</span>')
+    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-[#569cd6]">$1</span>')
+    .replace(/(".*?")/g, '<span class="text-[#ce9178]">$1</span>')
+    .replace(/\b(\d+)\b/g, '<span class="text-[#b5cea8]">$1</span>');
+
+  return (
+    <code dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }} />
+  );
+}
+
 export function TraceabilityView({ 
   selectedFile, 
   activeReference, 
   onReferenceClick 
 }: TraceabilityViewProps) {
+  const { state } = useProject();
+  
+  // Get mappings from context or use empty array
+  const referenceMappings = useMemo(() => {
+    if (state.referenceMappings.length > 0) {
+      return state.referenceMappings;
+    }
+    // Convert traceability matrix if available
+    if (state.traceabilityMatrix.length > 0) {
+      return state.traceabilityMatrix.map((entry, i) => ({
+        id: entry.id || `REF-${i + 1}`,
+        markdownText: entry.source_text,
+        dafnyLines: { 
+          start: entry.line_number || 1, 
+          end: (entry.line_number || 1) + 5 
+        },
+        dafnyCode: entry.code_line,
+      }));
+    }
+    return [];
+  }, [state.referenceMappings, state.traceabilityMatrix]);
+
   const activeMapping = referenceMappings.find(m => m.id === activeReference);
+  
+  // Use dafny code from context
+  const dafnyCode = state.dafnyCode || defaultDafnyCode;
+  const codeLines = dafnyCode.split("\n");
+
+  // Parse markdown content to extract requirements for display
+  const markdownContent = state.markdownContent || state.structuredSpec || '';
+
+  // Check if we have any data
+  const hasData = referenceMappings.length > 0 || state.dafnyCode;
+
+  if (!hasData) {
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <div className="text-center">
+          <AlertCircle className="mx-auto h-12 w-12 text-muted-foreground/50" />
+          <h3 className="mt-4 text-lg font-medium text-foreground">No Traceability Data</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Generate a formal specification from your requirements to see traceability mappings.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full w-full">
@@ -209,6 +144,11 @@ export function TraceabilityView({
           <span className="ml-2 rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
             Trace Mode
           </span>
+          {state.statistics && (
+            <span className="ml-2 text-[10px] text-muted-foreground">
+              {state.statistics.coverage_percentage.toFixed(0)}% coverage
+            </span>
+          )}
         </div>
 
         {/* Breadcrumb */}
@@ -223,78 +163,78 @@ export function TraceabilityView({
           <div className="mx-auto max-w-2xl px-6 py-6">
             <article className="text-sm leading-relaxed">
               <h1 className="mb-4 text-xl font-semibold text-foreground">
-                Token Approval Contract Requirements
+                Requirements Traceability
               </h1>
 
-              <section className="mb-6">
-                <h2 className="mb-3 text-base font-medium text-foreground">
-                  Functional Requirements
-                </h2>
+              {referenceMappings.length > 0 ? (
+                <section className="mb-6">
+                  <h2 className="mb-3 text-base font-medium text-foreground">
+                    Mapped Requirements ({referenceMappings.length})
+                  </h2>
 
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                    <h3 className="mb-2 text-sm font-medium text-foreground">FR-1: Transfer Operations</h3>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex flex-wrap items-center gap-1">
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 self-start rounded-full bg-primary" />
-                        <span><strong className="text-foreground">FR-1.1</strong>: Users MUST be able to transfer tokens from their own balance to another address</span>
-                        <ReferenceBadge 
-                          refId="Ref-1" 
-                          isActive={activeReference === "Ref-1"} 
-                          onClick={() => onReferenceClick(activeReference === "Ref-1" ? null : "Ref-1")}
-                          mapping={referenceMappings[0]}
-                        />
-                      </li>
-                      <li className="flex flex-wrap items-center gap-1">
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 self-start rounded-full bg-primary" />
-                        <span><strong className="text-foreground">FR-1.2</strong>: Transfers MUST fail if the sender has insufficient balance</span>
-                        <ReferenceBadge 
-                          refId="Ref-4" 
-                          isActive={activeReference === "Ref-4"} 
-                          onClick={() => onReferenceClick(activeReference === "Ref-4" ? null : "Ref-4")}
-                          mapping={referenceMappings[3]}
-                        />
-                      </li>
-                      <li className="flex items-start gap-1">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                        <span><strong className="text-foreground">FR-1.3</strong>: Transfers to the zero address MUST be prohibited</span>
-                      </li>
-                    </ul>
+                  <div className="space-y-4">
+                    {referenceMappings.map((mapping, index) => (
+                      <div key={mapping.id} className="rounded-lg border border-border bg-secondary/30 p-4">
+                        <div className="flex items-start gap-2">
+                          <span className="mt-0.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                          <div className="flex-1">
+                            <span className="text-sm text-muted-foreground">
+                              {mapping.markdownText}
+                            </span>
+                            <ReferenceBadge 
+                              refId={mapping.id} 
+                              isActive={activeReference === mapping.id} 
+                              onClick={() => onReferenceClick(activeReference === mapping.id ? null : mapping.id)}
+                              mapping={mapping}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </section>
+                </section>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No requirement mappings found. Generate a specification to create traceability links.
+                </p>
+              )}
 
-              <section className="mb-6">
-                <h2 className="mb-3 text-base font-medium text-foreground">
-                  Security Invariants
-                </h2>
-
-                <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
-                  <h3 className="mb-2 text-sm font-medium text-foreground">SI-1: Conservation of Tokens</h3>
-                  <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-                    <strong className="text-destructive">Critical</strong>: The total supply of tokens MUST remain constant across all operations.
-                    <ReferenceBadge 
-                      refId="Ref-2" 
-                      isActive={activeReference === "Ref-2"} 
-                      onClick={() => onReferenceClick(activeReference === "Ref-2" ? null : "Ref-2")}
-                      mapping={referenceMappings[1]}
-                    />
-                  </p>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <h3 className="mb-2 text-sm font-medium text-foreground">SI-2: No Negative Balances</h3>
-                  <p className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-                    All balances MUST be non-negative at all times.
-                    <ReferenceBadge 
-                      refId="Ref-3" 
-                      isActive={activeReference === "Ref-3"} 
-                      onClick={() => onReferenceClick(activeReference === "Ref-3" ? null : "Ref-3")}
-                      mapping={referenceMappings[2]}
-                    />
-                  </p>
-                </div>
-              </section>
+              {/* Show gaps if any */}
+              {state.gaps.length > 0 && (
+                <section className="mt-6">
+                  <h2 className="mb-3 text-base font-medium text-destructive">
+                    Gaps ({state.gaps.length})
+                  </h2>
+                  <div className="space-y-2">
+                    {state.gaps.map((gap) => (
+                      <div 
+                        key={gap.id} 
+                        className={cn(
+                          "rounded-lg border p-3 text-sm",
+                          gap.severity === 'critical' 
+                            ? "border-destructive/50 bg-destructive/10" 
+                            : "border-warning/50 bg-warning/10"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={cn(
+                            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                            gap.severity === 'critical' ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
+                          )}>
+                            {gap.severity}
+                          </span>
+                          <span className="text-foreground">{gap.description}</span>
+                        </div>
+                        {gap.suggestion && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Suggestion: {gap.suggestion}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
             </article>
           </div>
         </div>
@@ -323,8 +263,6 @@ export function TraceabilityView({
         {/* Breadcrumb */}
         <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
           <span>Root Spec</span>
-          <ChevronRight className="h-3 w-3" />
-          <span>Auth.dfy</span>
           <ChevronRight className="h-3 w-3" />
           <span className="text-foreground">Spec.dfy</span>
         </div>
@@ -400,16 +338,10 @@ export function TraceabilityView({
   );
 }
 
-function CodeLine({ line }: { line: string }) {
-  const highlightedLine = line
-    .replace(/(\/\/.*$)/g, '<span class="text-muted-foreground/70">$1</span>')
-    .replace(/\b(module|datatype|predicate|method|lemma|returns|requires|ensures|forall|calc|include|var)\b/g, '<span class="text-[#c586c0]">$1</span>')
-    .replace(/\b(map|uint256|address|bool|TokenState)\b/g, '<span class="text-[#4ec9b0]">$1</span>')
-    .replace(/\b(true|false|old|in)\b/g, '<span class="text-[#569cd6]">$1</span>')
-    .replace(/(".*?")/g, '<span class="text-[#ce9178]">$1</span>')
-    .replace(/\b(\d+)\b/g, '<span class="text-[#b5cea8]">$1</span>');
+const defaultDafnyCode = `// spec.dfy - Generated Dafny Specification
+// Generate a specification to see code here
 
-  return (
-    <code dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }} />
-  );
+module Specification {
+  // Your specification will appear here
 }
+`;

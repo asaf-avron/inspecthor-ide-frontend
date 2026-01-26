@@ -1,6 +1,7 @@
 "use client";
 
-import { FileText, ChevronRight, Sparkles, ArrowRight, Hash, List, CheckSquare, Layers, AlertTriangle } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import { FileText, ChevronRight, Sparkles, ArrowRight, Hash, List, CheckSquare, Layers, AlertTriangle, Edit3, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -8,6 +9,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useProject } from "@/lib/project-context";
+import { cn } from "@/lib/utils";
 
 interface MarkdownEditorProps {
   onGenerateSpec: () => void;
@@ -17,6 +20,119 @@ interface MarkdownEditorProps {
   isDeconstructing?: boolean;
 }
 
+// Simple markdown renderer for preview
+function renderMarkdown(content: string): React.ReactNode {
+  const lines = content.split('\n');
+  const elements: React.ReactNode[] = [];
+  let listItems: string[] = [];
+  let inCodeBlock = false;
+  let codeContent: string[] = [];
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(
+        <ul key={`list-${elements.length}`} className="mb-4 space-y-1.5 text-sm text-muted-foreground">
+          {listItems.map((item, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+              <span dangerouslySetInnerHTML={{ __html: formatInline(item) }} />
+            </li>
+          ))}
+        </ul>
+      );
+      listItems = [];
+    }
+  };
+
+  const formatInline = (text: string): string => {
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="text-foreground">$1</strong>')
+      .replace(/`(.*?)`/g, '<code class="rounded bg-background px-1 py-0.5 text-primary font-mono text-xs">$1</code>');
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Code blocks
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        elements.push(
+          <pre key={`code-${elements.length}`} className="mb-4 overflow-auto rounded-lg bg-background p-4 font-mono text-sm text-foreground">
+            {codeContent.join('\n')}
+          </pre>
+        );
+        codeContent = [];
+        inCodeBlock = false;
+      } else {
+        flushList();
+        inCodeBlock = true;
+      }
+      continue;
+    }
+
+    if (inCodeBlock) {
+      codeContent.push(line);
+      continue;
+    }
+
+    // Headings
+    if (line.startsWith('# ')) {
+      flushList();
+      elements.push(
+        <h1 key={`h1-${i}`} className="mb-2 text-2xl font-semibold tracking-tight text-foreground">
+          {line.slice(2)}
+        </h1>
+      );
+      continue;
+    }
+
+    if (line.startsWith('## ')) {
+      flushList();
+      elements.push(
+        <h2 key={`h2-${i}`} className="mb-2 mt-6 flex items-center gap-2 text-lg font-medium text-foreground">
+          {line.slice(3)}
+        </h2>
+      );
+      continue;
+    }
+
+    if (line.startsWith('### ')) {
+      flushList();
+      elements.push(
+        <h3 key={`h3-${i}`} className="mb-2 mt-4 text-sm font-medium text-foreground">
+          {line.slice(4)}
+        </h3>
+      );
+      continue;
+    }
+
+    // Horizontal rule
+    if (line.match(/^-{3,}$/) || line.match(/^\*{3,}$/)) {
+      flushList();
+      elements.push(<hr key={`hr-${i}`} className="my-6 border-border" />);
+      continue;
+    }
+
+    // List items
+    if (line.match(/^[-*]\s+/)) {
+      const content = line.replace(/^[-*]\s+/, '');
+      listItems.push(content);
+      continue;
+    }
+
+    // Regular paragraph
+    if (line.trim()) {
+      flushList();
+      elements.push(
+        <p key={`p-${i}`} className="mb-4 text-sm leading-relaxed text-muted-foreground" dangerouslySetInnerHTML={{ __html: formatInline(line) }} />
+      );
+    }
+  }
+
+  flushList();
+  return elements;
+}
+
 export function MarkdownEditor({ 
   onGenerateSpec, 
   isGenerating,
@@ -24,6 +140,34 @@ export function MarkdownEditor({
   onDeconstructToUnits,
   isDeconstructing,
 }: MarkdownEditorProps) {
+  const { state, setMarkdownContent, saveFile } = useProject();
+  const [isEditing, setIsEditing] = useState(true);
+  const [localContent, setLocalContent] = useState(state.markdownContent);
+
+  // Sync local content when context changes (e.g., after project creation)
+  useMemo(() => {
+    if (state.markdownContent !== localContent && !isEditing) {
+      setLocalContent(state.markdownContent);
+    }
+  }, [state.markdownContent]);
+
+  const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newContent = e.target.value;
+    setLocalContent(newContent);
+    setMarkdownContent(newContent);
+  }, [setMarkdownContent]);
+
+  const handleSave = useCallback(async () => {
+    try {
+      await saveFile('requirements.md', localContent, 'markdown');
+    } catch (error) {
+      console.error('Failed to save:', error);
+    }
+  }, [saveFile, localContent]);
+
+  // Use local content for display, fallback to context
+  const displayContent = localContent || state.markdownContent || defaultMarkdownContent;
+
   return (
     <div className="flex h-full flex-col bg-background">
       {/* Tab Bar */}
@@ -38,16 +182,48 @@ export function MarkdownEditor({
               </span>
             )}
           </div>
+          
+          {/* Edit/Preview Toggle */}
+          <div className="flex items-center gap-1 px-2">
+            <button
+              onClick={() => setIsEditing(true)}
+              className={cn(
+                "flex h-6 items-center gap-1 rounded px-2 text-xs transition-colors",
+                isEditing ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Edit3 className="h-3 w-3" />
+              Edit
+            </button>
+            <button
+              onClick={() => setIsEditing(false)}
+              className={cn(
+                "flex h-6 items-center gap-1 rounded px-2 text-xs transition-colors",
+                !isEditing ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Eye className="h-3 w-3" />
+              Preview
+            </button>
+          </div>
         </div>
         
         {/* Generate Button */}
-        <div className="pr-2">
+        <div className="flex items-center gap-2 pr-2">
+          <Button
+            onClick={handleSave}
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+          >
+            Save
+          </Button>
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   onClick={onGenerateSpec}
-                  disabled={isGenerating}
+                  disabled={isGenerating || !displayContent.trim()}
                   size="sm"
                   className="h-7 gap-1.5 bg-gradient-to-r from-violet-500 to-primary px-3 text-xs font-medium text-foreground hover:from-violet-500/90 hover:to-primary/90"
                 >
@@ -93,203 +269,78 @@ export function MarkdownEditor({
         </div>
       )}
 
-      {/* Toolbar */}
-      <div className="flex h-8 items-center gap-1 border-b border-border bg-secondary/10 px-3">
-        <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-          <Hash className="h-3.5 w-3.5" />
-        </button>
-        <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-          <List className="h-3.5 w-3.5" />
-        </button>
-        <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
-          <CheckSquare className="h-3.5 w-3.5" />
-        </button>
-        <div className="mx-2 h-4 w-px bg-border" />
-        <span className="text-[10px] text-muted-foreground">Edit Mode</span>
-      </div>
-
-      {/* Markdown Content */}
-      <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-3xl px-8 py-6">
-          <article className="prose prose-invert prose-sm max-w-none">
-            {/* Title */}
-            <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground">
-              Token Approval Contract Requirements
-            </h1>
-
-            {/* Overview */}
-            <section className="mb-6">
-              <h2 className="mb-2 mt-6 flex items-center gap-2 text-lg font-medium text-foreground">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/20 text-xs text-primary">
-                  1
-                </span>
-                Overview
-              </h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                This document specifies the formal requirements for a secure ERC-20 style token approval system. 
-                The specification must be verifiable using Dafny.
-              </p>
-            </section>
-
-            <hr className="my-6 border-border" />
-
-            {/* Functional Requirements */}
-            <section className="mb-6">
-              <h2 className="mb-4 mt-6 flex items-center gap-2 text-lg font-medium text-foreground">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/20 text-xs text-primary">
-                  2
-                </span>
-                Functional Requirements
-              </h2>
-
-              <div className="space-y-4">
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <h3 className="mb-2 text-sm font-medium text-foreground">FR-1: Transfer Operations</h3>
-                  <ul className="space-y-1.5 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                      <span><strong className="text-foreground">FR-1.1</strong>: Users MUST be able to transfer tokens from their own balance to another address</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                      <span><strong className="text-foreground">FR-1.2</strong>: Transfers MUST fail if the sender has insufficient balance</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                      <span><strong className="text-foreground">FR-1.3</strong>: Transfers to the zero address MUST be prohibited</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <h3 className="mb-2 text-sm font-medium text-foreground">FR-2: Approval Mechanism</h3>
-                  <ul className="space-y-1.5 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
-                      <span><strong className="text-foreground">FR-2.1</strong>: Token holders MUST be able to approve third parties to spend on their behalf</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
-                      <span><strong className="text-foreground">FR-2.2</strong>: Approved spending MUST be limited to the approved amount</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
-                      <span><strong className="text-foreground">FR-2.3</strong>: Multiple approvals for different spenders MUST be independent</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <h3 className="mb-2 text-sm font-medium text-foreground">FR-3: TransferFrom Operations</h3>
-                  <ul className="space-y-1.5 text-sm text-muted-foreground">
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
-                      <span><strong className="text-foreground">FR-3.1</strong>: Approved spenders MUST be able to transfer tokens within their allowance</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
-                      <span><strong className="text-foreground">FR-3.2</strong>: TransferFrom MUST decrement the allowance by the transferred amount</span>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-violet-400" />
-                      <span><strong className="text-foreground">FR-3.3</strong>: TransferFrom MUST fail if allowance is exceeded</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </section>
-
-            <hr className="my-6 border-border" />
-
-            {/* Security Invariants */}
-            <section className="mb-6">
-              <h2 className="mb-4 mt-6 flex items-center gap-2 text-lg font-medium text-foreground">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-destructive/20 text-xs text-destructive">
-                  !
-                </span>
-                Security Invariants
-              </h2>
-
-              <div className="mb-4 rounded-lg border border-destructive/30 bg-destructive/10 p-4">
-                <h3 className="mb-2 text-sm font-medium text-foreground">SI-1: Conservation of Tokens</h3>
-                <p className="mb-3 text-sm text-muted-foreground">
-                  <strong className="text-destructive">Critical</strong>: The total supply of tokens MUST remain constant across all operations.
-                </p>
-                <div className="rounded bg-background/50 p-3 font-mono text-sm text-foreground">
-                  {"∑"}<sub>addr</sub> balance[addr] = totalSupply
-                </div>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <h3 className="mb-1 text-sm font-medium text-foreground">SI-2: No Negative Balances</h3>
-                  <p className="text-xs text-muted-foreground">All balances MUST be non-negative at all times.</p>
-                </div>
-                <div className="rounded-lg border border-border bg-secondary/30 p-4">
-                  <h3 className="mb-1 text-sm font-medium text-foreground">SI-3: No Overflow</h3>
-                  <p className="text-xs text-muted-foreground">All arithmetic operations MUST be checked for overflow conditions.</p>
-                </div>
-              </div>
-            </section>
-
-            <hr className="my-6 border-border" />
-
-            {/* Formal Properties Table */}
-            <section className="mb-6">
-              <h2 className="mb-4 mt-6 flex items-center gap-2 text-lg font-medium text-foreground">
-                <span className="flex h-5 w-5 items-center justify-center rounded bg-primary/20 text-xs text-primary">
-                  3
-                </span>
-                Formal Properties
-              </h2>
-
-              <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-border bg-secondary/50">
-                      <th className="px-4 py-2 text-left font-medium text-foreground">Property</th>
-                      <th className="px-4 py-2 text-left font-medium text-foreground">Description</th>
-                      <th className="px-4 py-2 text-left font-medium text-foreground">Priority</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    <tr className="bg-background">
-                      <td className="px-4 py-2 font-mono text-xs text-primary">TotalSupplyConservation</td>
-                      <td className="px-4 py-2 text-muted-foreground">Sum of balances equals total supply</td>
-                      <td className="px-4 py-2"><span className="rounded bg-destructive/20 px-1.5 py-0.5 text-xs font-medium text-destructive">P0</span></td>
-                    </tr>
-                    <tr className="bg-secondary/20">
-                      <td className="px-4 py-2 font-mono text-xs text-primary">NoNegativeBalance</td>
-                      <td className="px-4 py-2 text-muted-foreground">All balances {">="} 0</td>
-                      <td className="px-4 py-2"><span className="rounded bg-destructive/20 px-1.5 py-0.5 text-xs font-medium text-destructive">P0</span></td>
-                    </tr>
-                    <tr className="bg-background">
-                      <td className="px-4 py-2 font-mono text-xs text-primary">AllowanceRespected</td>
-                      <td className="px-4 py-2 text-muted-foreground">TransferFrom {"<="} allowance</td>
-                      <td className="px-4 py-2"><span className="rounded bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning">P1</span></td>
-                    </tr>
-                    <tr className="bg-secondary/20">
-                      <td className="px-4 py-2 font-mono text-xs text-primary">TransferDecrementsSource</td>
-                      <td className="px-4 py-2 text-muted-foreground">Sender balance decreases by exact amount</td>
-                      <td className="px-4 py-2"><span className="rounded bg-warning/20 px-1.5 py-0.5 text-xs font-medium text-warning">P1</span></td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </section>
-
-            {/* Notes */}
-            <section className="rounded-lg border border-border bg-secondary/20 p-4">
-              <h3 className="mb-2 text-sm font-medium text-foreground">Notes</h3>
-              <ul className="space-y-1 text-xs text-muted-foreground">
-                <li>This specification will be translated to Dafny formal verification code</li>
-                <li>All properties marked P0 are <strong className="text-destructive">blocking</strong> for deployment</li>
-                <li>See <code className="rounded bg-background px-1 py-0.5 text-primary">spec.dfy</code> for the formal implementation</li>
-              </ul>
-            </section>
-          </article>
+      {/* Toolbar (only in edit mode) */}
+      {isEditing && (
+        <div className="flex h-8 items-center gap-1 border-b border-border bg-secondary/10 px-3">
+          <button 
+            className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            onClick={() => {
+              const textarea = document.querySelector('textarea');
+              if (textarea) {
+                const start = textarea.selectionStart;
+                const end = textarea.selectionEnd;
+                const newContent = localContent.slice(0, start) + '# ' + localContent.slice(end);
+                setLocalContent(newContent);
+                setMarkdownContent(newContent);
+              }
+            }}
+          >
+            <Hash className="h-3.5 w-3.5" />
+          </button>
+          <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <List className="h-3.5 w-3.5" />
+          </button>
+          <button className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground">
+            <CheckSquare className="h-3.5 w-3.5" />
+          </button>
+          <div className="mx-2 h-4 w-px bg-border" />
+          <span className="text-[10px] text-muted-foreground">
+            {displayContent.length} characters
+          </span>
         </div>
+      )}
+
+      {/* Content Area */}
+      <div className="flex-1 overflow-auto">
+        {isEditing ? (
+          /* Edit Mode - Textarea */
+          <textarea
+            value={localContent || displayContent}
+            onChange={handleContentChange}
+            placeholder="Write your requirements specification in Markdown..."
+            className="h-full w-full resize-none bg-transparent p-6 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            spellCheck={false}
+          />
+        ) : (
+          /* Preview Mode - Rendered Markdown */
+          <div className="mx-auto max-w-3xl px-8 py-6">
+            <article className="prose prose-invert prose-sm max-w-none">
+              {renderMarkdown(displayContent)}
+            </article>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+// Default content when no project is loaded
+const defaultMarkdownContent = `# Requirements Specification
+
+## Overview
+Describe your system requirements here.
+
+## Functional Requirements
+
+### FR-1: Core Functionality
+- **FR-1.1**: Users MUST be able to...
+- **FR-1.2**: The system MUST...
+
+## Security Invariants
+
+### SI-1: Data Integrity
+- All data MUST be validated before processing
+
+## Notes
+- This specification will be translated to Dafny formal verification code
+`;

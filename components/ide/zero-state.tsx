@@ -1,16 +1,16 @@
 "use client";
 
-import { useState } from "react";
-import { Upload, FileText, Sparkles, ArrowRight, FolderUp } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Upload, FileText, Sparkles, ArrowRight, FolderUp, Loader2 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
 interface ZeroStateProps {
-  onUploadRequirements: () => void;
-  onNewManualSpec: () => void;
-  onGenerateWithAI: (prompt: string) => void;
+  onUploadRequirements: (content?: string) => void | Promise<void>;
+  onNewManualSpec: () => void | Promise<void>;
+  onGenerateWithAI: (prompt: string) => void | Promise<void>;
 }
 
 export function ZeroState({ 
@@ -20,6 +20,44 @@ export function ZeroState({
 }: ZeroStateProps) {
   const [aiPrompt, setAiPrompt] = useState("");
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const readFileContent = useCallback(async (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        resolve(content);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  }, []);
+
+  const handleFileUpload = useCallback(async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    const validExtensions = ['.md', '.txt', '.markdown'];
+    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+    
+    if (!validExtensions.includes(extension)) {
+      alert('Please upload a .md, .txt, or .markdown file');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const content = await readFileContent(file);
+      await onUploadRequirements(content);
+    } catch (error) {
+      console.error('Failed to read file:', error);
+      alert('Failed to read file. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [readFileContent, onUploadRequirements]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -30,10 +68,18 @@ export function ZeroState({
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
-    onUploadRequirements();
+    await handleFileUpload(e.dataTransfer.files);
+  };
+
+  const handleCardClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    await handleFileUpload(e.target.files);
   };
 
   return (
@@ -48,20 +94,34 @@ export function ZeroState({
       </div>
 
       <div className="grid w-full max-w-4xl gap-4 md:grid-cols-3">
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".md,.txt,.markdown"
+          onChange={handleFileInputChange}
+          className="hidden"
+        />
+
         {/* Upload Requirements Card */}
         <Card 
           className={cn(
             "cursor-pointer transition-all hover:border-primary/50 hover:bg-secondary/50",
-            isDragging && "border-primary bg-primary/10"
+            isDragging && "border-primary bg-primary/10",
+            isLoading && "pointer-events-none opacity-70"
           )}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={onUploadRequirements}
+          onClick={handleCardClick}
         >
           <CardHeader className="pb-2">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/20">
-              <Upload className="h-6 w-6 text-blue-400" />
+              {isLoading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+              ) : (
+                <Upload className="h-6 w-6 text-blue-400" />
+              )}
             </div>
             <CardTitle className="text-base">Upload Requirements</CardTitle>
             <CardDescription className="text-xs">
@@ -77,7 +137,7 @@ export function ZeroState({
             >
               <FolderUp className="mb-2 h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
-                .md, .txt, .pdf
+                .md, .txt, .markdown
               </span>
             </div>
           </CardContent>

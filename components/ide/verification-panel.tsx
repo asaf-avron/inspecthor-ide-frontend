@@ -1,79 +1,16 @@
 "use client";
 
-import { CheckCircle2, ShieldAlert, Clock, ChevronRight, AlertTriangle } from "lucide-react";
+import { useMemo } from "react";
+import { CheckCircle2, ShieldAlert, Clock, ChevronRight, AlertTriangle, Play, Loader2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-
-interface ProofObligation {
-  id: string;
-  name: string;
-  location: string;
-  status: "verified" | "failed" | "pending" | "warning";
-  time?: string;
-  details?: string;
-}
-
-const proofObligations: ProofObligation[] = [
-  {
-    id: "1",
-    name: "ValidState: predicate well-formed",
-    location: "Spec.dfy:15",
-    status: "verified",
-    time: "0.12s",
-    details: "Predicate ValidState has been verified to be well-formed. All referenced fields exist and type constraints are satisfied.",
-  },
-  {
-    id: "2",
-    name: "Transfer: precondition satisfiability",
-    location: "Spec.dfy:22",
-    status: "verified",
-    time: "0.08s",
-    details: "The preconditions for the Transfer method are satisfiable. There exist valid inputs that can satisfy all requires clauses.",
-  },
-  {
-    id: "3",
-    name: "Transfer: postcondition ValidState",
-    location: "Spec.dfy:28",
-    status: "failed",
-    time: "1.24s",
-    details: "Cannot verify that ValidState(newState) holds after Transfer. The solver found a potential counterexample where the sum of balances may not equal totalSupply when 'to' address is not in the original balances map.",
-  },
-  {
-    id: "4",
-    name: "Transfer: postcondition balance update",
-    location: "Spec.dfy:29",
-    status: "verified",
-    time: "0.31s",
-    details: "Verified that the balance update postcondition holds: newState.balances[to] equals the old balance plus the transfer amount.",
-  },
-  {
-    id: "5",
-    name: "TransferPreservesTotalSupply: lemma body",
-    location: "Spec.dfy:44",
-    status: "verified",
-    time: "0.89s",
-    details: "The lemma body has been verified. The calculational proof correctly establishes that total supply is preserved.",
-  },
-  {
-    id: "6",
-    name: "Overflow check: fromBalance - amount",
-    location: "Spec.dfy:35",
-    status: "warning",
-    time: "0.05s",
-    details: "Potential underflow detected. While the precondition guards against this, consider adding an explicit assertion for documentation.",
-  },
-  {
-    id: "7",
-    name: "Overflow check: toBalance + amount",
-    location: "Spec.dfy:36",
-    status: "pending",
-    details: "Pending verification. This check requires additional solver time due to complex arithmetic constraints.",
-  },
-];
+import { Button } from "@/components/ui/button";
+import { useProject } from "@/lib/project-context";
+import type { ProofObligation } from "@/lib/types";
 
 const statusConfig = {
   verified: {
@@ -100,13 +37,56 @@ const statusConfig = {
     label: "Warning",
     description: "Verification passed with warnings. Review recommended.",
   },
+  timeout: {
+    icon: Clock,
+    className: "text-warning",
+    label: "Timeout",
+    description: "Verification timed out. Consider increasing timeout or simplifying the proof.",
+  },
 };
 
+// Default proof obligations to show when no verification has run
+const defaultProofObligations: ProofObligation[] = [
+  {
+    id: "0",
+    name: "No verification results",
+    location: "Run verification to see proof obligations",
+    status: "pending",
+    details: "Click 'Run Verification' in the header to verify the Dafny specification.",
+  },
+];
+
 export function VerificationPanel() {
+  const { state, runVerification } = useProject();
+  
+  // Use proof obligations from context or show default
+  const proofObligations = useMemo(() => {
+    if (state.proofObligations.length > 0) {
+      return state.proofObligations;
+    }
+    // If we have gaps from spec generation, show them as pending
+    if (state.gaps.length > 0) {
+      return state.gaps.map((gap, i) => ({
+        id: gap.id || `gap-${i}`,
+        name: gap.description,
+        location: gap.location?.file || 'Spec.dfy',
+        status: gap.severity === 'critical' ? 'failed' as const : 'warning' as const,
+        details: gap.suggestion,
+      }));
+    }
+    return defaultProofObligations;
+  }, [state.proofObligations, state.gaps]);
+
   const verifiedCount = proofObligations.filter(p => p.status === "verified").length;
   const failedCount = proofObligations.filter(p => p.status === "failed").length;
   const pendingCount = proofObligations.filter(p => p.status === "pending").length;
-  const warningCount = proofObligations.filter(p => p.status === "warning").length;
+  const warningCount = proofObligations.filter(p => p.status === "warning" || p.status === "timeout").length;
+
+  const handleRunVerification = async () => {
+    if (state.dafnyCode) {
+      await runVerification(state.dafnyCode);
+    }
+  };
 
   return (
     <TooltipProvider>
@@ -115,7 +95,23 @@ export function VerificationPanel() {
         <div className="border-b border-border p-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-medium text-foreground">Proof Obligations</h3>
-            <span className="text-xs text-muted-foreground">{proofObligations.length} total</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">{proofObligations.length} total</span>
+              <Button
+                onClick={handleRunVerification}
+                disabled={state.isVerifying || !state.dafnyCode}
+                size="sm"
+                variant="ghost"
+                className="h-6 gap-1 px-2 text-xs"
+              >
+                {state.isVerifying ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Play className="h-3 w-3" />
+                )}
+                {state.isVerifying ? "Verifying..." : "Run"}
+              </Button>
+            </div>
           </div>
           <div className="mt-2 flex items-center gap-3 text-xs">
             <div className="flex items-center gap-1">
@@ -135,12 +131,26 @@ export function VerificationPanel() {
               <span className="text-muted-foreground">{pendingCount}</span>
             </div>
           </div>
+          
+          {/* Verification Results Summary */}
+          {state.verificationResults && (
+            <div className={`mt-2 rounded px-2 py-1 text-xs ${
+              state.verificationResults.verified 
+                ? "bg-primary/20 text-primary" 
+                : "bg-destructive/20 text-destructive"
+            }`}>
+              {state.verificationResults.verified 
+                ? `Verification passed in ${state.verificationResults.verification_time_ms}ms`
+                : `Verification failed: ${state.verificationResults.errors.length} errors`
+              }
+            </div>
+          )}
         </div>
 
         {/* Proof List */}
         <div className="flex-1 overflow-auto">
           {proofObligations.map((proof) => {
-            const config = statusConfig[proof.status];
+            const config = statusConfig[proof.status] || statusConfig.pending;
             const Icon = config.icon;
 
             return (
@@ -183,6 +193,26 @@ export function VerificationPanel() {
             );
           })}
         </div>
+
+        {/* Errors Section */}
+        {state.verificationResults?.errors && state.verificationResults.errors.length > 0 && (
+          <div className="border-t border-border p-3">
+            <h4 className="mb-2 text-xs font-medium text-destructive">Verification Errors</h4>
+            <div className="space-y-2">
+              {state.verificationResults.errors.map((error, i) => (
+                <div key={i} className="rounded bg-destructive/10 p-2 text-xs">
+                  <div className="font-mono text-destructive">
+                    Line {error.line}:{error.column}
+                  </div>
+                  <div className="mt-1 text-muted-foreground">{error.message}</div>
+                  {error.suggestion && (
+                    <div className="mt-1 text-primary">Suggestion: {error.suggestion}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </TooltipProvider>
   );
