@@ -1,6 +1,7 @@
 "use client";
 
 import { Shield, Wallet, Play, ChevronDown, Settings, HelpCircle, Github, Eye, Edit3 } from "lucide-react";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -139,6 +140,8 @@ export function Header({
         <Button variant="ghost" size="sm" className="hidden h-7 w-7 p-0 text-muted-foreground hover:text-foreground sm:flex">
           <Settings className="h-4 w-4" />
         </Button>
+        
+        <ThemeToggle />
 
         <div className="mx-2 hidden h-4 w-px bg-border sm:block" />
 
