@@ -146,7 +146,10 @@ export function ZeroState({
         {/* New Manual Spec Card */}
         <Card 
           className="cursor-pointer transition-all hover:border-primary/50 hover:bg-secondary/50"
-          onClick={onNewManualSpec}
+          onClick={() => {
+            console.log("New Manual Spec clicked!");
+            onNewManualSpec();
+          }}
         >
           <CardHeader className="pb-2">
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/20">
