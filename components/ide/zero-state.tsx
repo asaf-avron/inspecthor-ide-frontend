@@ -137,11 +137,7 @@ export function ZeroState({
             >
               <FolderUp className="mb-2 h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
-<<<<<<< HEAD
                 .md, .txt, .markdown
-=======
-                .md, .txt, .pdf
->>>>>>> origin/main
               </span>
             </div>
           </CardContent>

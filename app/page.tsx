@@ -218,11 +218,7 @@ ${prompt}
           onFileSelect={handleFileSelect}
           isCollapsed={isExplorerCollapsed}
           onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
-<<<<<<< HEAD
           hasProject={state.hasProject}
-=======
-          hasProject={hasProject}
->>>>>>> origin/main
         />
 
         {/* Main Editor Area */}
@@ -231,17 +227,10 @@ ${prompt}
           <div className="flex flex-1 flex-col overflow-hidden">
             <MarkdownEditor 
               onGenerateSpec={handleGenerateSpec}
-<<<<<<< HEAD
               isGenerating={state.isGenerating}
               isRootFile={selectedFile === "requirements.md"}
               onDeconstructToUnits={handleDeconstructToUnits}
               isDeconstructing={state.isDeconstructing}
-=======
-              isGenerating={isGeneratingSpec}
-              isRootFile={selectedFile === "requirements.md"}
-              onDeconstructToUnits={handleDeconstructToUnits}
-              isDeconstructing={isDeconstructing}
->>>>>>> origin/main
             />
           </div>
         ) : (
