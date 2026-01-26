@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Header, ViewMode } from "@/components/ide/header";
 import { ProjectExplorer } from "@/components/ide/project-explorer";
 import { CodeEditor } from "@/components/ide/code-editor";
@@ -13,71 +13,109 @@ import { TraceabilityView } from "@/components/ide/traceability-view";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2, Sparkles, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useProject } from "@/lib/project-context";
 
 export default function GuardianGatewayIDE() {
-  const [hasProject, setHasProject] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isGeneratingSpec, setIsGeneratingSpec] = useState(false);
-  const [isDeconstructing, setIsDeconstructing] = useState(false);
+  const { 
+    state, 
+    checkHealth,
+    createProject,
+    selectFile,
+    generateSpec,
+    runVerification,
+    setDeconstructing,
+    addLog,
+  } = useProject();
+
+  // Local UI state (not persisted)
   const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(true);
   const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState("verification");
-  const [selectedFile, setSelectedFile] = useState("requirements.md");
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
   const [activeReference, setActiveReference] = useState<string | null>(null);
 
-  const handleRunVerification = useCallback(() => {
-    setIsVerifying(true);
-    setIsTerminalCollapsed(false);
-    setTimeout(() => {
-      setIsVerifying(false);
-    }, 3000);
-  }, []);
+  // Derive selected file from context or default
+  const selectedFile = state.selectedFileId || "requirements.md";
 
-  const handleGenerateSpec = useCallback(() => {
-    setIsGeneratingSpec(true);
+  // Check backend health on mount
+  useEffect(() => {
+    checkHealth();
+  }, [checkHealth]);
+
+  const handleRunVerification = useCallback(async () => {
     setIsTerminalCollapsed(false);
-    
-    // Simulate generation then transition to spec.dfy
-    setTimeout(() => {
-      setIsGeneratingSpec(false);
-      setSelectedFile("spec.dfy");
-    }, 2000);
-  }, []);
+    await runVerification(state.dafnyCode);
+  }, [runVerification, state.dafnyCode]);
+
+  const handleGenerateSpec = useCallback(async () => {
+    setIsTerminalCollapsed(false);
+    await generateSpec(state.markdownContent);
+    // Switch to the generated Dafny file
+    selectFile("spec.dfy");
+  }, [generateSpec, state.markdownContent, selectFile]);
 
   const handleDeconstructToUnits = useCallback(() => {
-    setIsDeconstructing(true);
+    setDeconstructing(true);
     setIsTerminalCollapsed(false);
+    addLog('info', 'Deconstructing specification into units...');
     
-    // Simulate deconstruction
+    // Simulate deconstruction (backend endpoint not yet implemented)
     setTimeout(() => {
-      setIsDeconstructing(false);
-      // Could update file structure here
+      setDeconstructing(false);
+      addLog('success', 'Deconstruction complete');
     }, 2500);
-  }, []);
+  }, [setDeconstructing, addLog]);
 
   const handleFileSelect = useCallback((fileId: string) => {
-    setSelectedFile(fileId);
+    selectFile(fileId);
     // Reset active reference when changing files
     setActiveReference(null);
-  }, []);
+  }, [selectFile]);
 
-  const handleUploadRequirements = useCallback(() => {
-    setHasProject(true);
-    setSelectedFile("requirements.md");
-  }, []);
+  const handleUploadRequirements = useCallback(async (content?: string) => {
+    const defaultContent = `# Requirements Specification
 
-  const handleNewManualSpec = useCallback(() => {
-    setHasProject(true);
-    setSelectedFile("requirements.md");
-  }, []);
+## Overview
+Describe your system requirements here.
 
-  const handleGenerateWithAI = useCallback((prompt: string) => {
-    setHasProject(true);
-    setSelectedFile("requirements.md");
+## Functional Requirements
+
+### FR-1: Core Functionality
+- **FR-1.1**: Users MUST be able to...
+- **FR-1.2**: The system MUST...
+
+## Security Invariants
+
+### SI-1: Data Integrity
+- All data MUST be validated before processing
+`;
+    
+    await createProject(content || defaultContent);
     setIsTerminalCollapsed(false);
-    // Could trigger AI generation here
-  }, []);
+  }, [createProject]);
+
+  const handleNewManualSpec = useCallback(async () => {
+    await handleUploadRequirements();
+  }, [handleUploadRequirements]);
+
+  const handleGenerateWithAI = useCallback(async (prompt: string) => {
+    // Create a project with the AI prompt as initial content
+    const content = `# AI-Generated Requirements
+
+## User Prompt
+${prompt}
+
+## Generated Requirements
+(Generating specification based on prompt...)
+`;
+    await createProject(content);
+    setIsTerminalCollapsed(false);
+    
+    // Immediately trigger spec generation
+    setTimeout(async () => {
+      await generateSpec(prompt);
+    }, 500);
+  }, [createProject, generateSpec]);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
@@ -94,13 +132,16 @@ export default function GuardianGatewayIDE() {
   const isMarkdownFile = selectedFile.endsWith(".md");
   const isDafnyFile = selectedFile.endsWith(".dfy");
 
+  // Count verification errors for badge
+  const errorCount = state.proofObligations.filter(po => po.status === 'failed').length;
+
   // Zero State - No Project Loaded
-  if (!hasProject) {
+  if (!state.hasProject) {
     return (
       <div className="flex h-screen flex-col overflow-hidden bg-background">
         <Header 
           onRunVerification={handleRunVerification} 
-          isVerifying={isVerifying}
+          isVerifying={state.isVerifying}
           showVerification={false}
           hasProject={false}
         />
@@ -120,7 +161,7 @@ export default function GuardianGatewayIDE() {
         {/* Header */}
         <Header 
           onRunVerification={handleRunVerification} 
-          isVerifying={isVerifying}
+          isVerifying={state.isVerifying}
           showVerification={true}
           hasProject={true}
           viewMode={viewMode}
@@ -135,7 +176,7 @@ export default function GuardianGatewayIDE() {
             onFileSelect={handleFileSelect}
             isCollapsed={isExplorerCollapsed}
             onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
-            hasProject={hasProject}
+            hasProject={state.hasProject}
           />
 
           {/* Traceability Split Pane */}
@@ -147,10 +188,10 @@ export default function GuardianGatewayIDE() {
         </div>
 
         {/* Bottom Panel - Terminal */}
-        <TerminalPanel
+          <TerminalPanel
           isCollapsed={isTerminalCollapsed}
           onToggle={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
-          isGenerating={isGeneratingSpec}
+          isGenerating={state.isGenerating}
         />
       </div>
     );
@@ -162,7 +203,7 @@ export default function GuardianGatewayIDE() {
       {/* Header */}
       <Header 
         onRunVerification={handleRunVerification} 
-        isVerifying={isVerifying}
+        isVerifying={state.isVerifying}
         showVerification={isDafnyFile}
         hasProject={true}
         viewMode={viewMode}
@@ -177,7 +218,7 @@ export default function GuardianGatewayIDE() {
           onFileSelect={handleFileSelect}
           isCollapsed={isExplorerCollapsed}
           onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
-          hasProject={hasProject}
+          hasProject={state.hasProject}
         />
 
         {/* Main Editor Area */}
@@ -186,10 +227,10 @@ export default function GuardianGatewayIDE() {
           <div className="flex flex-1 flex-col overflow-hidden">
             <MarkdownEditor 
               onGenerateSpec={handleGenerateSpec}
-              isGenerating={isGeneratingSpec}
+              isGenerating={state.isGenerating}
               isRootFile={selectedFile === "requirements.md"}
               onDeconstructToUnits={handleDeconstructToUnits}
-              isDeconstructing={isDeconstructing}
+              isDeconstructing={state.isDeconstructing}
             />
           </div>
         ) : (
@@ -222,9 +263,11 @@ export default function GuardianGatewayIDE() {
                     >
                       <CheckCircle2 className="h-3.5 w-3.5" />
                       Verification
-                      <span className="ml-1 rounded bg-destructive/20 px-1 py-0.5 text-[10px] font-medium text-destructive">
-                        1
-                      </span>
+                      {errorCount > 0 && (
+                        <span className="ml-1 rounded bg-destructive/20 px-1 py-0.5 text-[10px] font-medium text-destructive">
+                          {errorCount}
+                        </span>
+                      )}
                     </TabsTrigger>
                     <TabsTrigger
                       value="gemini"
@@ -253,7 +296,7 @@ export default function GuardianGatewayIDE() {
       <TerminalPanel
         isCollapsed={isTerminalCollapsed}
         onToggle={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
-        isGenerating={isGeneratingSpec || isDeconstructing}
+        isGenerating={state.isGenerating || state.isDeconstructing}
       />
     </div>
   );
