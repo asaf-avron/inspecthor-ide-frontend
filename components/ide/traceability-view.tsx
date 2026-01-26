@@ -65,13 +65,14 @@ function ReferenceBadge({
 }
 
 function CodeLine({ line }: { line: string }) {
+  // Using CSS variables for theme-aware syntax highlighting
   const highlightedLine = line
-    .replace(/(\/\/.*$)/g, '<span class="text-muted-foreground/70">$1</span>')
-    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-[#c586c0]">$1</span>')
-    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-[#4ec9b0]">$1</span>')
-    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-[#569cd6]">$1</span>')
-    .replace(/(".*?")/g, '<span class="text-[#ce9178]">$1</span>')
-    .replace(/\b(\d+)\b/g, '<span class="text-[#b5cea8]">$1</span>');
+    .replace(/(\/\/.*$)/g, '<span class="text-syntax-comment">$1</span>')
+    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-syntax-keyword">$1</span>')
+    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-syntax-type">$1</span>')
+    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-syntax-function">$1</span>')
+    .replace(/(".*?")/g, '<span class="text-syntax-string">$1</span>')
+    .replace(/\b(\d+)\b/g, '<span class="text-syntax-number">$1</span>');
 
   return (
     <code dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }} />

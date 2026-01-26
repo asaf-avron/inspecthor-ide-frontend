@@ -3,47 +3,58 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Guardian Gateway - Dark Slate Theme */
+/* Guardian Gateway - Light Mode Theme (Default) */
 :root {
-  --background: oklch(0.14 0.005 260);
-  --foreground: oklch(0.95 0 0);
-  --card: oklch(0.17 0.005 260);
-  --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.15 0.005 260);
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: oklch(0.72 0.19 145);
-  --primary-foreground: oklch(0.14 0.005 260);
-  --secondary: oklch(0.22 0.005 260);
-  --secondary-foreground: oklch(0.88 0 0);
-  --muted: oklch(0.22 0.005 260);
-  --muted-foreground: oklch(0.65 0.01 260);
-  --accent: oklch(0.25 0.01 260);
-  --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.55 0.22 25);
-  --destructive-foreground: oklch(0.95 0 0);
-  --border: oklch(0.28 0.01 260);
-  --input: oklch(0.20 0.005 260);
-  --ring: oklch(0.72 0.19 145);
-  --chart-1: oklch(0.72 0.19 145);
-  --chart-2: oklch(0.65 0.15 200);
-  --chart-3: oklch(0.60 0.18 280);
-  --chart-4: oklch(0.75 0.15 60);
-  --chart-5: oklch(0.55 0.22 25);
+  --background: oklch(0.98 0.002 260);
+  --foreground: oklch(0.15 0.01 260);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.15 0.01 260);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.15 0.01 260);
+  --primary: oklch(0.45 0.18 145);
+  --primary-foreground: oklch(0.98 0 0);
+  --secondary: oklch(0.94 0.005 260);
+  --secondary-foreground: oklch(0.25 0.01 260);
+  --muted: oklch(0.94 0.005 260);
+  --muted-foreground: oklch(0.45 0.01 260);
+  --accent: oklch(0.94 0.008 260);
+  --accent-foreground: oklch(0.15 0.01 260);
+  --destructive: oklch(0.50 0.20 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.88 0.008 260);
+  --input: oklch(0.92 0.005 260);
+  --ring: oklch(0.45 0.18 145);
+  --chart-1: oklch(0.45 0.18 145);
+  --chart-2: oklch(0.50 0.15 200);
+  --chart-3: oklch(0.45 0.18 280);
+  --chart-4: oklch(0.60 0.15 60);
+  --chart-5: oklch(0.50 0.20 25);
   --radius: 0.5rem;
-  --sidebar: oklch(0.12 0.005 260);
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: oklch(0.72 0.19 145);
-  --sidebar-primary-foreground: oklch(0.14 0.005 260);
-  --sidebar-accent: oklch(0.22 0.005 260);
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: oklch(0.28 0.01 260);
-  --sidebar-ring: oklch(0.72 0.19 145);
-  --success: oklch(0.72 0.19 145);
-  --success-foreground: oklch(0.14 0.005 260);
-  --warning: oklch(0.75 0.15 60);
-  --warning-foreground: oklch(0.14 0.005 260);
+  --sidebar: oklch(0.96 0.003 260);
+  --sidebar-foreground: oklch(0.15 0.01 260);
+  --sidebar-primary: oklch(0.45 0.18 145);
+  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --sidebar-accent: oklch(0.92 0.006 260);
+  --sidebar-accent-foreground: oklch(0.15 0.01 260);
+  --sidebar-border: oklch(0.88 0.008 260);
+  --sidebar-ring: oklch(0.45 0.18 145);
+  --success: oklch(0.45 0.18 145);
+  --success-foreground: oklch(0.98 0 0);
+  --warning: oklch(0.60 0.15 60);
+  --warning-foreground: oklch(0.15 0.01 260);
+  
+  /* Syntax highlighting - Light mode */
+  --syntax-keyword: oklch(0.50 0.22 300);
+  --syntax-type: oklch(0.45 0.16 200);
+  --syntax-string: oklch(0.45 0.14 145);
+  --syntax-number: oklch(0.50 0.18 30);
+  --syntax-comment: oklch(0.55 0.02 260);
+  --syntax-function: oklch(0.45 0.18 260);
+  --syntax-variable: oklch(0.35 0.01 260);
+  --syntax-operator: oklch(0.40 0.15 25);
 }
 
+/* Guardian Gateway - Dark Mode Theme */
 .dark {
   --background: oklch(0.14 0.005 260);
   --foreground: oklch(0.95 0 0);
@@ -81,6 +92,16 @@
   --success-foreground: oklch(0.14 0.005 260);
   --warning: oklch(0.75 0.15 60);
   --warning-foreground: oklch(0.14 0.005 260);
+  
+  /* Syntax highlighting - Dark mode */
+  --syntax-keyword: oklch(0.75 0.15 300);
+  --syntax-type: oklch(0.72 0.12 200);
+  --syntax-string: oklch(0.78 0.12 145);
+  --syntax-number: oklch(0.75 0.14 30);
+  --syntax-comment: oklch(0.55 0.02 260);
+  --syntax-function: oklch(0.72 0.14 260);
+  --syntax-variable: oklch(0.88 0.01 260);
+  --syntax-operator: oklch(0.70 0.12 25);
 }
 
 @theme inline {
@@ -126,6 +147,16 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  
+  /* Syntax highlighting tokens */
+  --color-syntax-keyword: var(--syntax-keyword);
+  --color-syntax-type: var(--syntax-type);
+  --color-syntax-string: var(--syntax-string);
+  --color-syntax-number: var(--syntax-number);
+  --color-syntax-comment: var(--syntax-comment);
+  --color-syntax-function: var(--syntax-function);
+  --color-syntax-variable: var(--syntax-variable);
+  --color-syntax-operator: var(--syntax-operator);
 }
 
 @layer base {
@@ -134,5 +165,16 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Smooth theme transitions */
+  html {
+    transition: color-scheme 0.3s ease;
+  }
+  
+  html:not(.no-transitions) *,
+  html:not(.no-transitions) *::before,
+  html:not(.no-transitions) *::after {
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.15s ease;
   }
 }

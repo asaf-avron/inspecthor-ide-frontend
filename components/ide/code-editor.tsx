@@ -149,7 +149,7 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
               onChange={handleCodeChange}
               className="absolute inset-0 resize-none bg-transparent pl-2 font-mono text-[13px] leading-5 text-transparent caret-foreground focus:outline-none"
               spellCheck={false}
-              style={{ caretColor: 'white' }}
+              style={{ caretColor: 'var(--foreground)' }}
             />
           </div>
         </div>
@@ -159,14 +159,14 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
 }
 
 function CodeLine({ line, isError }: { line: string; isError?: boolean }) {
-  // Simple syntax highlighting for Dafny
+  // Simple syntax highlighting for Dafny using CSS variables for theme support
   const highlightedLine = line
-    .replace(/(\/\/.*$)/g, '<span class="text-muted-foreground/70">$1</span>')
-    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-[#c586c0]">$1</span>')
-    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-[#4ec9b0]">$1</span>')
-    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-[#569cd6]">$1</span>')
-    .replace(/(".*?")/g, '<span class="text-[#ce9178]">$1</span>')
-    .replace(/\b(\d+)\b/g, '<span class="text-[#b5cea8]">$1</span>');
+    .replace(/(\/\/.*$)/g, '<span class="text-syntax-comment">$1</span>')
+    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-syntax-keyword">$1</span>')
+    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-syntax-type">$1</span>')
+    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-syntax-function">$1</span>')
+    .replace(/(".*?")/g, '<span class="text-syntax-string">$1</span>')
+    .replace(/\b(\d+)\b/g, '<span class="text-syntax-number">$1</span>');
 
   return (
     <code 
