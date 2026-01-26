@@ -36,8 +36,8 @@ function ReferenceBadge({
           className={cn(
             "ml-2 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all",
             isActive 
-              ? "bg-blue-500/30 text-blue-300 ring-1 ring-blue-400/50" 
-              : "bg-blue-500/20 text-blue-400 hover:bg-blue-500/30"
+              ? "bg-info/30 text-info ring-1 ring-info/50" 
+              : "bg-info-muted text-info hover:bg-info/30"
           )}
         >
           <Bookmark className="h-2.5 w-2.5" />
@@ -47,7 +47,7 @@ function ReferenceBadge({
       <PopoverContent side="right" className="w-80 p-0">
         <div className="border-b border-border bg-secondary/50 px-3 py-2">
           <div className="flex items-center gap-2 text-xs font-medium text-foreground">
-            <Eye className="h-3.5 w-3.5 text-blue-400" />
+            <Eye className="h-3.5 w-3.5 text-info" />
             Quick Preview: {refId}
           </div>
         </div>
@@ -139,10 +139,10 @@ export function TraceabilityView({
         {/* Tab Bar */}
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
-            <FileText className="h-3.5 w-3.5 text-blue-400" />
+            <FileText className="h-3.5 w-3.5 text-info" />
             <span>Requirements.md</span>
           </div>
-          <span className="ml-2 rounded bg-blue-500/20 px-1.5 py-0.5 text-[10px] font-medium text-blue-400">
+          <span className="ml-2 rounded bg-info-muted px-1.5 py-0.5 text-[10px] font-medium text-info">
             Trace Mode
           </span>
           {state.statistics && (
@@ -283,7 +283,7 @@ export function TraceabilityView({
                     key={i} 
                     className={cn(
                       "px-3",
-                      isHighlighted && "bg-blue-500/20 text-blue-400"
+                      isHighlighted && "bg-info-muted text-info"
                     )}
                   >
                     {lineNum}
@@ -322,7 +322,7 @@ export function TraceabilityView({
                       key={i} 
                       className={cn(
                         isHighlighted 
-                          ? "bg-blue-500/20 ring-1 ring-inset ring-blue-500/30" 
+                          ? "bg-info-muted ring-1 ring-inset ring-info/30" 
                           : "hover:bg-accent/30"
                       )}
                     >
