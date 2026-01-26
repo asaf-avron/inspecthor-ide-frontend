@@ -42,6 +42,11 @@
   --success-foreground: oklch(0.98 0 0);
   --warning: oklch(0.60 0.15 60);
   --warning-foreground: oklch(0.15 0.01 260);
+  --info: oklch(0.55 0.18 240);
+  --info-foreground: oklch(0.98 0 0);
+  --info-muted: oklch(0.92 0.05 240);
+  --accent-violet: oklch(0.60 0.20 300);
+  --accent-violet-muted: oklch(0.92 0.06 300);
   
   /* Syntax highlighting - Light mode */
   --syntax-keyword: oklch(0.50 0.22 300);
@@ -92,6 +97,11 @@
   --success-foreground: oklch(0.14 0.005 260);
   --warning: oklch(0.75 0.15 60);
   --warning-foreground: oklch(0.14 0.005 260);
+  --info: oklch(0.65 0.15 240);
+  --info-foreground: oklch(0.14 0.005 260);
+  --info-muted: oklch(0.22 0.08 240);
+  --accent-violet: oklch(0.72 0.18 300);
+  --accent-violet-muted: oklch(0.25 0.10 300);
   
   /* Syntax highlighting - Dark mode */
   --syntax-keyword: oklch(0.75 0.15 300);
@@ -147,6 +157,11 @@
   --color-success-foreground: var(--success-foreground);
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-info-muted: var(--info-muted);
+  --color-accent-violet: var(--accent-violet);
+  --color-accent-violet-muted: var(--accent-violet-muted);
   
   /* Syntax highlighting tokens */
   --color-syntax-keyword: var(--syntax-keyword);
@@ -157,6 +172,15 @@
   --color-syntax-function: var(--syntax-function);
   --color-syntax-variable: var(--syntax-variable);
   --color-syntax-operator: var(--syntax-operator);
+  
+  --syntax-keyword: var(--syntax-keyword);
+  --syntax-type: var(--syntax-type);
+  --syntax-string: var(--syntax-string);
+  --syntax-number: var(--syntax-number);
+  --syntax-comment: var(--syntax-comment);
+  --syntax-function: var(--syntax-function);
+  --syntax-variable: var(--syntax-variable);
+  --syntax-operator: var(--syntax-operator);
 }
 
 @layer base {

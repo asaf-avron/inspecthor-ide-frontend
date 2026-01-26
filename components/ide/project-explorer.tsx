@@ -73,7 +73,7 @@ function FileIcon({ type, isActive }: { type: FileType; isActive?: boolean }) {
         <FileText
           className={cn(
             "h-4 w-4 shrink-0",
-            isActive ? "text-blue-400" : "text-blue-400/70"
+            isActive ? "text-info" : "text-info/70"
           )}
         />
       );
@@ -91,7 +91,7 @@ function FileIcon({ type, isActive }: { type: FileType; isActive?: boolean }) {
         <Puzzle
           className={cn(
             "h-4 w-4 shrink-0",
-            isActive ? "text-violet-400" : "text-violet-400/70"
+            isActive ? "text-accent-violet" : "text-accent-violet/70"
           )}
         />
       );
@@ -144,9 +144,9 @@ function FileTreeItem({
             )}
             {isFolder ? (
               isExpanded ? (
-                <FolderOpen className="h-4 w-4 shrink-0 text-yellow-500/80" />
+                <FolderOpen className="h-4 w-4 shrink-0 text-warning" />
               ) : (
-                <Folder className="h-4 w-4 shrink-0 text-yellow-500/80" />
+                <Folder className="h-4 w-4 shrink-0 text-warning" />
               )
             ) : (
               <FileIcon type={item.type} isActive={isActive} />
@@ -260,7 +260,7 @@ export function ProjectExplorer({
                   className={cn(
                     "flex h-8 w-8 items-center justify-center rounded transition-colors",
                     selectedFile === "requirements.md" || selectedFile.endsWith(".md")
-                      ? "bg-accent text-blue-400"
+                      ? "bg-accent text-info"
                       : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
                   )}
                 >
