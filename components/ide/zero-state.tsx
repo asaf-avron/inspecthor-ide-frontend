@@ -116,11 +116,11 @@ export function ZeroState({
           onClick={handleCardClick}
         >
           <CardHeader className="pb-2">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-blue-500/20">
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-info-muted">
               {isLoading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-blue-400" />
+                <Loader2 className="h-6 w-6 animate-spin text-info" />
               ) : (
-                <Upload className="h-6 w-6 text-blue-400" />
+                <Upload className="h-6 w-6 text-info" />
               )}
             </div>
             <CardTitle className="text-base">Upload Requirements</CardTitle>
@@ -178,8 +178,8 @@ export function ZeroState({
         {/* Generate with AI Card */}
         <Card className="transition-all hover:border-primary/50 hover:bg-secondary/50">
           <CardHeader className="pb-2">
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-violet-500/20">
-              <Sparkles className="h-6 w-6 text-violet-400" />
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-accent-violet-muted">
+              <Sparkles className="h-6 w-6 text-accent-violet" />
             </div>
             <CardTitle className="text-base">Generate with AI</CardTitle>
             <CardDescription className="text-xs">
@@ -203,7 +203,7 @@ export function ZeroState({
                 onClick={() => aiPrompt.trim() && onGenerateWithAI(aiPrompt)}
                 disabled={!aiPrompt.trim()}
                 size="sm"
-                className="h-8 w-full gap-1.5 bg-gradient-to-r from-violet-500 to-primary text-xs font-medium text-foreground hover:from-violet-500/90 hover:to-primary/90"
+                className="h-8 w-full gap-1.5 bg-gradient-to-r from-accent-violet to-primary text-xs font-medium text-primary-foreground hover:from-accent-violet/90 hover:to-primary/90"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 Scaffold Spec
