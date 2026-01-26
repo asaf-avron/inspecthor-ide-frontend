@@ -47,7 +47,7 @@ export type {
 
 // API Configuration
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_KEY = process.env.GUARDIAN_API_KEY || '';
+const API_KEY = process.env.NEXT_PUBLIC_GUARDIAN_API_KEY || '';
 
 export class APIError extends Error {
     constructor(
