@@ -21,9 +21,9 @@ export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params?.projectId as string | undefined;
-  
-  const { 
-    state: projectState, 
+
+  const {
+    state: projectState,
     loadProjectFromUrl,
     checkHealth,
     generateSpec,
@@ -40,7 +40,7 @@ export default function ProjectPage() {
       router.push('/app');
       return;
     }
-    
+
     if (projectId !== projectState.projectId) {
       loadProjectFromUrl(projectId).catch((error: any) => {
         if (error.status === 404 || error.status === 403) {
@@ -68,7 +68,7 @@ export default function ProjectPage() {
   const [isResizingExplorer, setIsResizingExplorer] = useState(false);
   const [isRootFile, setIsRootFile] = useState(false);
 
-  const selectedFile = fileState.selectedFileId || fileState.files[0]?.file_id || null;
+  const selectedFile = fileState.selectedFileId || null;
 
   const handleRunVerification = useCallback(async () => {
     setIsTerminalCollapsed(false);
@@ -111,14 +111,14 @@ export default function ProjectPage() {
 
   const handleResize = useCallback((e: MouseEvent) => {
     if (!isResizing || !splitPaneRef.current) return;
-    
+
     // Use requestAnimationFrame for smooth updates
     requestAnimationFrame(() => {
       const containerRect = splitPaneRef.current!.getBoundingClientRect();
       const mouseX = e.clientX;
       const relativeX = mouseX - containerRect.left;
       const percentage = (relativeX / containerRect.width) * 100;
-      
+
       const constrainedPercentage = Math.max(20, Math.min(70, 100 - percentage));
       setRightPaneWidth(constrainedPercentage);
     });
@@ -134,7 +134,7 @@ export default function ProjectPage() {
       window.addEventListener('mouseup', handleResizeEnd);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
-      
+
       return () => {
         window.removeEventListener('mousemove', handleResize);
         window.removeEventListener('mouseup', handleResizeEnd);
@@ -155,14 +155,14 @@ export default function ProjectPage() {
 
   const handleTraceResize = useCallback((e: MouseEvent) => {
     if (!isResizingTrace || !traceSplitPaneRef.current) return;
-    
+
     // Use requestAnimationFrame for smooth updates
     requestAnimationFrame(() => {
       const containerRect = traceSplitPaneRef.current!.getBoundingClientRect();
       const mouseX = e.clientX;
       const relativeX = mouseX - containerRect.left;
       const percentage = (relativeX / containerRect.width) * 100;
-      
+
       const constrainedPercentage = Math.max(30, Math.min(70, percentage));
       setTracePaneWidth(constrainedPercentage);
     });
@@ -178,7 +178,7 @@ export default function ProjectPage() {
       window.addEventListener('mouseup', handleTraceResizeEnd);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
-      
+
       return () => {
         window.removeEventListener('mousemove', handleTraceResize);
         window.removeEventListener('mouseup', handleTraceResizeEnd);
@@ -198,14 +198,14 @@ export default function ProjectPage() {
 
   const handleTerminalResize = useCallback((e: MouseEvent) => {
     if (!isResizingTerminal) return;
-    
+
     // Use requestAnimationFrame for smooth updates
     requestAnimationFrame(() => {
       // Calculate height from bottom of viewport
       const viewportHeight = window.innerHeight;
       const mouseY = e.clientY;
       const heightFromBottom = viewportHeight - mouseY;
-      
+
       const constrainedHeight = Math.max(100, Math.min(600, heightFromBottom));
       setTerminalHeight(constrainedHeight);
     });
@@ -221,7 +221,7 @@ export default function ProjectPage() {
       window.addEventListener('mouseup', handleTerminalResizeEnd);
       document.body.style.cursor = 'row-resize';
       document.body.style.userSelect = 'none';
-      
+
       return () => {
         window.removeEventListener('mousemove', handleTerminalResize);
         window.removeEventListener('mouseup', handleTerminalResizeEnd);
@@ -239,7 +239,7 @@ export default function ProjectPage() {
 
   const handleExplorerResize = useCallback((e: MouseEvent) => {
     if (!isResizingExplorer) return;
-    
+
     // Use requestAnimationFrame for smooth updates
     requestAnimationFrame(() => {
       const mouseX = e.clientX;
@@ -259,7 +259,7 @@ export default function ProjectPage() {
       window.addEventListener('mouseup', handleExplorerResizeEnd);
       document.body.style.cursor = 'col-resize';
       document.body.style.userSelect = 'none';
-      
+
       return () => {
         window.removeEventListener('mousemove', handleExplorerResize);
         window.removeEventListener('mouseup', handleExplorerResizeEnd);
@@ -288,7 +288,7 @@ export default function ProjectPage() {
   if (!projectId) {
     return null; // Will redirect in useEffect
   }
-  
+
   if (projectState.isLoading || !projectState.currentProject) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -308,8 +308,8 @@ export default function ProjectPage() {
   if (viewMode === "trace") {
     return (
       <div className="flex h-screen flex-col overflow-hidden bg-background">
-        <Header 
-          onRunVerification={handleRunVerification} 
+        <Header
+          onRunVerification={handleRunVerification}
           isVerifying={verificationState.isVerifying}
           showVerification={true}
           hasProject={true}
@@ -327,7 +327,7 @@ export default function ProjectPage() {
             isResizing={isResizingExplorer}
           />
           {!isExplorerCollapsed && (
-            <div 
+            <div
               className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
               onMouseDown={handleExplorerResizeStart}
             >
@@ -342,11 +342,12 @@ export default function ProjectPage() {
               leftPaneWidth={tracePaneWidth}
               isResizing={isResizingTrace}
               onResizeStart={handleTraceResizeStart}
+              projectFiles={fileState.projectFiles}
             />
           </div>
         </div>
         {!isTerminalCollapsed && (
-          <div 
+          <div
             className="group flex h-1 cursor-row-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
             onMouseDown={handleTerminalResizeStart}
           >
@@ -367,8 +368,8 @@ export default function ProjectPage() {
   // Edit Mode
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <Header 
-        onRunVerification={handleRunVerification} 
+      <Header
+        onRunVerification={handleRunVerification}
         isVerifying={verificationState.isVerifying}
         showVerification={!!isDafnyFile}
         hasProject={true}
@@ -385,7 +386,7 @@ export default function ProjectPage() {
           width={isExplorerCollapsed ? undefined : explorerWidth}
         />
         {!isExplorerCollapsed && (
-          <div 
+          <div
             className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
             onMouseDown={handleExplorerResizeStart}
           >
@@ -394,7 +395,7 @@ export default function ProjectPage() {
         )}
         {isMarkdownFile ? (
           <div className="flex flex-1 flex-col overflow-hidden">
-            <MarkdownEditor 
+            <MarkdownEditor
               onGenerateSpec={handleGenerateSpec}
               isGenerating={projectState.isGenerating}
               isRootFile={isRootFile}
@@ -402,7 +403,7 @@ export default function ProjectPage() {
           </div>
         ) : isDafnyFile ? (
           <div ref={splitPaneRef} className="flex flex-1 overflow-hidden">
-            <div 
+            <div
               className={cn(
                 "flex min-w-0 flex-col border-r border-border transition-all duration-300",
                 isResizing && "transition-none"
@@ -411,13 +412,13 @@ export default function ProjectPage() {
             >
               <CodeEditor selectedFile={selectedFile || ''} />
             </div>
-            <div 
+            <div
               className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
               onMouseDown={handleResizeStart}
             >
               <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary" />
             </div>
-            <div 
+            <div
               className={cn(
                 "flex min-w-0 flex-col overflow-hidden",
                 isResizing && "transition-none"
@@ -464,7 +465,7 @@ export default function ProjectPage() {
         )}
       </div>
       {!isTerminalCollapsed && (
-        <div 
+        <div
           className="group flex h-1 cursor-row-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
           onMouseDown={handleTerminalResizeStart}
         >
