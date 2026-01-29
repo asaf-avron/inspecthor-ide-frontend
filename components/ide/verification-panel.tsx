@@ -62,10 +62,10 @@ export function VerificationPanel() {
   const { state: projectState } = useProject();
   const { state: fileState } = useFileContext();
   const { state: verificationState, runVerification } = useVerificationContext();
-  
+
   // Derive dafny code from active file
   const dafnyCode = fileState.activeFile?.fileType === 'dfy' ? fileState.activeFile.content : '';
-  
+
   // Use proof obligations from context or show default
   const proofObligations = useMemo(() => {
     if (verificationState.proofObligations.length > 0) {
@@ -79,6 +79,7 @@ export function VerificationPanel() {
         location: gap.location?.file || 'Spec.dfy',
         status: gap.severity === 'critical' ? 'failed' as const : 'warning' as const,
         details: gap.suggestion,
+        time: undefined, // Gaps don't have timing info
       }));
     }
     return defaultProofObligations;
@@ -138,15 +139,14 @@ export function VerificationPanel() {
               <span className="text-muted-foreground">{pendingCount}</span>
             </div>
           </div>
-          
+
           {/* Verification Results Summary */}
           {verificationState.verificationResults && (
-            <div className={`mt-2 rounded px-2 py-1 text-xs ${
-              verificationState.verificationResults.verified 
-                ? "bg-primary/20 text-primary" 
+            <div className={`mt-2 rounded px-2 py-1 text-xs ${verificationState.verificationResults.verified
+                ? "bg-primary/20 text-primary"
                 : "bg-destructive/20 text-destructive"
-            }`}>
-              {verificationState.verificationResults.verified 
+              }`}>
+              {verificationState.verificationResults.verified
                 ? `Verification passed in ${verificationState.verificationResults.verification_time_ms}ms`
                 : `Verification failed: ${verificationState.verificationResults.errors.length} errors`
               }
