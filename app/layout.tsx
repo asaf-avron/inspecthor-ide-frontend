@@ -2,8 +2,12 @@
 
 import React from "react"
 import { Analytics } from '@vercel/analytics/next'
+import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AuthProvider } from '@/lib/auth-context'
 import { ProjectProvider } from '@/lib/project-context'
+import { FileProvider } from '@/lib/contexts/file-context'
+import { VerificationProvider } from '@/lib/contexts/verification-context'
 import './globals.css'
 
 export default function RootLayout({
@@ -29,10 +33,17 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange={false}
         >
-          <ProjectProvider>
-            {children}
-          </ProjectProvider>
+          <AuthProvider>
+            <ProjectProvider>
+              <FileProvider>
+                <VerificationProvider>
+                  {children}
+                </VerificationProvider>
+              </FileProvider>
+            </ProjectProvider>
+          </AuthProvider>
         </ThemeProvider>
+        <Toaster position="bottom-right" />
         <Analytics />
       </body>
     </html>
