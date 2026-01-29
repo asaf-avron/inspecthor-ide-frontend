@@ -430,6 +430,16 @@ export function ProjectProvider({
             );
             dispatch({ type: 'SET_REFERENCE_MAPPINGS', payload: mappings });
 
+            // Refresh project structure to show newly created .dfy and unit files
+            try {
+                const structure = await apiClient.getProjectStructure(state.projectId);
+                dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
+                addLog('debug', 'Project structure refreshed');
+            } catch (refreshError) {
+                // Don't fail the whole operation if refresh fails
+                addLog('warn', 'Failed to refresh project structure');
+            }
+
             addLog('success', `Triage: ${response.triage.doc_type} (${(response.triage.confidence * 100).toFixed(0)}% confidence)`);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to generate specification';
