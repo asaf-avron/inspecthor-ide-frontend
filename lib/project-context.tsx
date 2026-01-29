@@ -25,13 +25,13 @@ export type ProjectMode = "local" | "cloud";
 export interface ProjectState {
     // Project mode (local-first vs cloud-synced)
     mode: ProjectMode;
-    
+
     // Project data
     projectId: string | null;
     currentProject: ProjectResponse | null;
     projectStructure: ProjectStructureResponse | null;
     hasProject: boolean;
-    
+
     // Generation results
     generatedSpec: GenerateSpecResponse | null;
     traceabilityMatrix: TraceabilityEntry[];
@@ -39,25 +39,25 @@ export interface ProjectState {
     gaps: Gap[];
     ambiguities: Ambiguity[];
     statistics: SpecStatistics | null;
-    
+
     // Refinement state
     refinedSpec: string | null;
     isRefining: boolean;
-    
+
     // Chat state
     chatHistory: ChatMessage[];
-    
+
     // Log state
     logs: LogEntry[];
-    
+
     // Loading states
     isLoading: boolean;
     isGenerating: boolean;
     isDeconstructing: boolean;
-    
+
     // Error state
     error: string | null;
-    
+
     // Health check
     isBackendHealthy: boolean;
     geminiConfigured: boolean;
@@ -121,13 +121,13 @@ function convertTraceabilityToMappings(
     dafnyCode: string
 ): ReferenceMapping[] {
     const lines = dafnyCode.split('\n');
-    
+
     return entries.map((entry) => {
         const lineNum = entry.line_number || 1;
         const startLine = Math.max(1, lineNum - 2);
         const endLine = Math.min(lines.length, lineNum + 5);
         const codeSnippet = lines.slice(startLine - 1, endLine).join('\n');
-        
+
         return {
             id: entry.id,
             markdownText: entry.source_text,
@@ -251,10 +251,10 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | null>(null);
 
 // === Provider ===
-export function ProjectProvider({ 
+export function ProjectProvider({
     children,
     initialMode = "local"
-}: { 
+}: {
     children: ReactNode;
     initialMode?: ProjectMode;
 }) {
@@ -299,24 +299,24 @@ export function ProjectProvider({
     const createProject = useCallback(async (name: string, description?: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        
+
         try {
             addLog('info', `Creating new project: ${name}...`);
-            
+
             // Create project via API (bootstraps README.md)
             const project = await apiClient.createProject(name, description);
-            
+
             dispatch({ type: 'SET_CURRENT_PROJECT', payload: project });
-            
+
             // Load project structure
             const structure = await apiClient.getProjectStructure(project.project_id);
             dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
-            
+
             // Navigate to project URL
             if (project.redirect_url) {
                 router.push(project.redirect_url);
             }
-            
+
             addLog('success', `Project created: ${project.name} (${project.file_count} files)`);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to create project';
@@ -327,27 +327,51 @@ export function ProjectProvider({
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     }, [addLog, router]);
-    
+
     const loadProjectFromUrl = useCallback(async (projectId: string) => {
         if (state.projectId === projectId && state.currentProject) {
             return; // Already loaded
         }
-        
+
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        
+
         try {
             addLog('info', `Loading project: ${projectId}...`);
-            
+
             const structure = await apiClient.getProjectStructure(projectId);
             dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
-            
+
+            // Try to load traceability for the first markdown file
+            const mdFile = structure.files.find(f => f.file_type === 'md');
+            if (mdFile) {
+                try {
+                    const traceability = await apiClient.getTraceability(mdFile.file_id);
+                    if (traceability.links && traceability.links.length > 0) {
+                        // Convert traceability links to the format used by the UI
+                        const entries: TraceabilityEntry[] = traceability.links.map(link => ({
+                            id: link.unit_id,
+                            source_text: link.title,
+                            status: (link.status as TraceabilityEntry['status']) || 'mapped',
+                            code_line: `lines ${link.source_range.start_line}-${link.source_range.end_line}`,
+                            line_number: link.source_range.start_line,
+                            confidence: 1.0, // Saved links have high confidence
+                        }));
+                        dispatch({ type: 'SET_TRACEABILITY_MATRIX', payload: entries });
+                        addLog('info', `Loaded ${entries.length} traceability links`);
+                    }
+                } catch (traceError) {
+                    // Traceability not available for this file - that's okay
+                    addLog('debug', 'No saved traceability data found');
+                }
+            }
+
             addLog('success', `Project loaded: ${structure.project.name} (${structure.files.length} files)`);
         } catch (error: any) {
             const message = error instanceof Error ? error.message : 'Failed to load project';
             dispatch({ type: 'SET_ERROR', payload: message });
             addLog('error', message);
-            
+
             // Redirect to app on 404/403
             if (error.status === 404 || error.status === 403) {
                 router.push('/app');
@@ -357,18 +381,18 @@ export function ProjectProvider({
             dispatch({ type: 'SET_LOADING', payload: false });
         }
     }, [state.projectId, state.currentProject, addLog, router]);
-    
+
     const switchProject = useCallback(async (newProjectId: string) => {
         if (state.projectId === newProjectId) {
             return; // Already on this project
         }
-        
+
         // Reset state
         dispatch({ type: 'RESET_PROJECT' });
-        
+
         // Navigate to new project
         router.push(`/app/${newProjectId}`);
-        
+
         // Load new project
         await loadProjectFromUrl(newProjectId);
     }, [state.projectId, router, loadProjectFromUrl]);
@@ -381,14 +405,14 @@ export function ProjectProvider({
         if (!state.projectId) {
             throw new Error('No project selected');
         }
-        
+
         dispatch({ type: 'SET_GENERATING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        
+
         try {
             addLog('info', 'Starting specification generation...');
             addLog('debug', `Input length: ${englishSpec.length} characters`);
-            
+
             const response = await apiClient.generateSpec(
                 englishSpec,
                 'standard',
@@ -396,16 +420,16 @@ export function ProjectProvider({
                 state.projectId,
                 sourceFileId
             );
-            
+
             dispatch({ type: 'SET_GENERATED_SPEC', payload: response });
-            
+
             // Convert traceability to mappings
             const mappings = convertTraceabilityToMappings(
                 response.traceability_matrix,
                 response.dafny_skeleton
             );
             dispatch({ type: 'SET_REFERENCE_MAPPINGS', payload: mappings });
-            
+
             addLog('success', `Triage: ${response.triage.doc_type} (${(response.triage.confidence * 100).toFixed(0)}% confidence)`);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to generate specification';
@@ -420,21 +444,21 @@ export function ProjectProvider({
     const findGaps = useCallback(async (spec: string, projectId?: string, sourceFileId?: string) => {
         dispatch({ type: 'SET_REFINING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        
+
         try {
             addLog('info', 'Finding gaps in specification...');
-            
+
             const response = await apiClient.findGaps({
                 spec,
                 project_id: projectId,
                 source_file_id: sourceFileId,
             });
-            
+
             // Update gaps, ambiguities, and statistics directly
             dispatch({ type: 'SET_GAPS', payload: response.gaps });
             dispatch({ type: 'SET_AMBIGUITIES', payload: response.ambiguities });
             dispatch({ type: 'SET_STATISTICS', payload: response.statistics });
-            
+
             addLog('success', `Found ${response.gaps.length} gaps, ${response.ambiguities.length} ambiguities`);
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to find gaps';
@@ -450,19 +474,19 @@ export function ProjectProvider({
         if (!spec || state.gaps.length === 0) {
             throw new Error('No spec or gaps to refine');
         }
-        
+
         dispatch({ type: 'SET_REFINING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        
+
         try {
             addLog('info', 'Refining specification...');
-            
+
             const response = await apiClient.refineSpec({
                 spec,
                 gaps: state.gaps,
                 apply_gap_ids: gapIds,
             });
-            
+
             dispatch({ type: 'SET_REFINED_SPEC', payload: response.refined_spec });
             addLog('success', `Applied ${response.applied_gaps.length} gap suggestions`);
         } catch (error) {
@@ -480,7 +504,7 @@ export function ProjectProvider({
         context?: ChatContext
     ): Promise<ChatResponse | null> => {
         dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'user', content: message } });
-        
+
         try {
             const response = await apiClient.chatWithAssistant(message, context, state.chatHistory);
             dispatch({ type: 'ADD_CHAT_MESSAGE', payload: { role: 'assistant', content: response.content } });
@@ -523,37 +547,37 @@ export function ProjectProvider({
     const deconstructToUnits = useCallback(async (sourceFileId: string) => {
         dispatch({ type: 'SET_DECONSTRUCTING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
-        
+
         try {
             if (!state.projectId) {
                 throw new Error('No project selected');
             }
-            
+
             addLog('info', 'Starting specification deconstruction...');
-            
+
             const response = await apiClient.deconstructSpec({
                 project_id: state.projectId,
                 source_file_id: sourceFileId,
                 strategy: 'auto'
             });
-            
+
             // Log results
             addLog('success', `Deconstruction complete: ${response.statistics.successful_units} units created`);
-            
+
             if (response.statistics.failed_units > 0) {
                 addLog('warn', `${response.statistics.failed_units} units failed`);
             }
-            
+
             if (response.errors.length > 0) {
                 response.errors.forEach(error => addLog('error', error));
             }
-            
+
             addLog('info', `Created ${response.statistics.total_files_created} files in ${response.statistics.processing_time_seconds}s`);
-            
+
             // Reload project structure to show new units
             const structure = await apiClient.getProjectStructure(state.projectId);
             dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
-            
+
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Deconstruction failed';
             dispatch({ type: 'SET_ERROR', payload: message });

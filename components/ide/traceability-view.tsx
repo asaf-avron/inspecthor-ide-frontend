@@ -197,6 +197,25 @@ export function TraceabilityView({
   // Parse markdown content to extract requirements for display
   const markdownContent = state.generatedSpec?.structured_spec || '';
 
+  // Derive actual filenames from project files or use defaults
+  const markdownFileName = useMemo(() => {
+    if (markdownBreadcrumb.length > 0) {
+      return markdownBreadcrumb[markdownBreadcrumb.length - 1].name;
+    }
+    return state.generatedSpec?.suggested_filename
+      ? `${state.generatedSpec.suggested_filename}.md`
+      : 'Requirements.md';
+  }, [markdownBreadcrumb, state.generatedSpec?.suggested_filename]);
+
+  const dafnyFileName = useMemo(() => {
+    if (dafnyBreadcrumb.length > 0) {
+      return dafnyBreadcrumb[dafnyBreadcrumb.length - 1].name;
+    }
+    return state.generatedSpec?.suggested_filename
+      ? `${state.generatedSpec.suggested_filename}.dfy`
+      : 'Spec.dfy';
+  }, [dafnyBreadcrumb, state.generatedSpec?.suggested_filename]);
+
   // Check if we have any data (traceability matrix persists even when switching files)
   const hasData = referenceMappings.length > 0 || state.traceabilityMatrix.length > 0 || state.generatedSpec?.dafny_skeleton;
 
@@ -228,7 +247,7 @@ export function TraceabilityView({
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
             <FileText className="h-3.5 w-3.5 text-info" />
-            <span>Requirements.md</span>
+            <span>{markdownFileName}</span>
           </div>
           <span className="ml-2 rounded bg-info-muted px-1.5 py-0.5 text-[10px] font-medium text-info">
             Trace Mode
@@ -349,7 +368,7 @@ export function TraceabilityView({
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
             <div className="h-3.5 w-3.5 rounded bg-primary/80" />
-            <span>Spec.dfy</span>
+            <span>{dafnyFileName}</span>
           </div>
           {activeMapping && (
             <span className="ml-2 text-[10px] text-muted-foreground">
