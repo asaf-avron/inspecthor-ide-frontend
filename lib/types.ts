@@ -59,6 +59,9 @@ export interface GenerateSpecRequest {
     english_spec: string;
     rigor_level?: RigorLevel;
     options?: GenerateSpecOptions;
+    current_filename?: string;
+    project_id?: string;
+    source_file_id?: string;
 }
 
 export interface TriageResult {
@@ -75,6 +78,9 @@ export interface GenerateSpecResponse {
     ambiguities: Ambiguity[];
     traceability_matrix: TraceabilityEntry[];
     statistics: SpecStatistics;
+    suggested_filename?: string;
+    units_created?: UnitInfo[];
+    subfolder_name?: string;
 }
 
 // === Verification Types ===
@@ -152,13 +158,18 @@ export interface VerifyDafnyResponse {
 }
 
 // === File Management Types ===
-export type FileType = "markdown" | "dafny";
+export type FileType = "md" | "dfy" | "unit";
 
 export interface FileSaveRequest {
     filename: string;
     content: string;
     file_type: FileType;
-    project_id?: string;
+    project_id: string;  // Required - files must belong to a project
+}
+
+export interface FileUpdateRequest {
+    content: string;
+    filename?: string;  // Optional rename
 }
 
 export interface FileSaveResponse {
@@ -173,9 +184,11 @@ export interface FileResponse {
     filename: string;
     content: string;
     file_type: string;
+    project_id: string;
     created_at: string;
     updated_at: string;
     size_bytes: number;
+    renamed?: boolean;  // Track if file was manually renamed
 }
 
 export interface FileListItem {
@@ -195,6 +208,69 @@ export interface FileListResponse {
 export interface FileDeleteResponse {
     deleted: boolean;
     file_id: string;
+}
+
+// === Project Management Types ===
+export interface Project {
+    project_id: string;
+    name: string;
+    description: string | null;
+    created_at: string;
+    updated_at: string;
+    file_count: number;
+}
+
+export interface ProjectCreateRequest {
+    name: string;
+    description?: string;
+}
+
+export interface ProjectUpdateRequest {
+    name?: string;
+    description?: string;
+}
+
+export interface ProjectResponse {
+    project_id: string;
+    name: string;
+    description: string | null;
+    created_at: string;
+    updated_at: string;
+    file_count: number;
+    redirect_url?: string;
+}
+
+export interface ProjectListParams {
+    limit?: number;
+    offset?: number;
+    sort?: "created_at" | "updated_at" | "name";
+    order?: "asc" | "desc";
+}
+
+export interface ProjectListResponse {
+    projects: ProjectResponse[];
+    total: number;
+    limit: number;
+    offset: number;
+}
+
+export interface FileMetadata {
+    file_id: string;
+    filename: string;
+    file_type: string;
+    updated_at: string;
+    size_bytes: number;
+}
+
+export interface ProjectStructureResponse {
+    project: ProjectResponse;
+    files: FileMetadata[];
+}
+
+export interface ProjectDeleteResponse {
+    deleted: boolean;
+    project_id: string;
+    files_deleted: number;
 }
 
 // === AI Assistant Types ===
@@ -234,6 +310,30 @@ export interface SuggestResponse {
     proposed_text: string;
 }
 
+// === Spec Refinement Types ===
+export interface FindGapsRequest {
+    spec: string;
+    project_id?: string;
+    source_file_id?: string;
+}
+
+export interface FindGapsResponse {
+    gaps: Gap[];
+    ambiguities: Ambiguity[];
+    statistics: SpecStatistics;
+}
+
+export interface RefineSpecRequest {
+    spec: string;
+    gaps: Gap[];
+    apply_gap_ids?: string[];
+}
+
+export interface RefineSpecResponse {
+    refined_spec: string;
+    applied_gaps: Gap[];
+}
+
 // === Health Types ===
 export interface HealthResponse {
     status: string;
@@ -263,4 +363,100 @@ export interface ReferenceMapping {
     markdownText: string;
     dafnyLines: { start: number; end: number };
     dafnyCode: string;
+}
+
+// === Deconstruction Types ===
+export interface UnitCandidate {
+    title: string;
+    description: string;
+    requirements: string[];
+    line_range: number[];  // [start, end]
+    dependencies: string[];
+}
+
+export interface UnitInfo {
+    unit_id: string;
+    unit_filename: string;
+    dafny_filename: string;
+    title: string;
+    description: string;
+    requirements: string[];
+    dafny_code: string;
+    line_range: number[];  // [start, end]
+}
+
+export interface UnitLinkInfo {
+    link_id: string;
+    unit_file_id: string;
+    dafny_file_id: string;
+    source_file_id: string;
+    link_type: string;
+    title: string;
+    source_range: {
+        start_line: number;
+        end_line: number;
+    };
+    verification_status: string;
+    created_at: string;
+}
+
+export interface DeconstructStats {
+    total_units: number;
+    successful_units: number;
+    failed_units: number;
+    total_files_created: number;
+    processing_time_seconds: number;
+}
+
+export interface DeconstructRequest {
+    project_id: string;
+    source_file_id: string;
+    strategy?: "auto" | "manual";
+    max_units?: number;
+    unit_boundaries?: number[][];  // [[start, end], ...]
+}
+
+export interface DeconstructResponse {
+    units: UnitInfo[];
+    links: UnitLinkInfo[];
+    statistics: DeconstructStats;
+    errors: string[];
+}
+
+export interface TraceabilityLink {
+    unit_id: string;
+    dafny_file_id: string;
+    title: string;
+    source_range: {
+        start_line: number;
+        end_line: number;
+    };
+    status: string;
+}
+
+export interface TraceabilityResponse {
+    source_file_id: string;
+    links: TraceabilityLink[];
+}
+
+// === File Operations Types ===
+export type SaveStatus = "clean" | "dirty" | "saving" | "error";
+
+export interface ActiveFileState {
+  id: string;
+  content: string;           // Current editor content
+  syncedContent: string;     // Last confirmed saved content
+  status: SaveStatus;
+  lastSavedAt: Date | null;
+  filename: string;
+  fileType: FileType;
+  projectId: string;
+}
+
+export interface FileCache {
+  [fileId: string]: {
+    content: string;
+    timestamp: number;
+    fileType: string;
+  }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type React from "react";
 import { FileText, ChevronRight, GripVertical, Eye, Bookmark, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,12 +10,15 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useProject } from "@/lib/project-context";
-import type { ReferenceMapping } from "@/lib/types";
+import type { ReferenceMapping, ProjectFileItem } from "@/lib/types";
 
 interface TraceabilityViewProps {
   selectedFile: string;
   activeReference: string | null;
   onReferenceClick: (refId: string | null) => void;
+  leftPaneWidth?: number; // Percentage width for left pane (default 50)
+  isResizing?: boolean;
+  onResizeStart?: (e: React.MouseEvent) => void;
 }
 
 function ReferenceBadge({ 
@@ -82,9 +86,85 @@ function CodeLine({ line }: { line: string }) {
 export function TraceabilityView({ 
   selectedFile, 
   activeReference, 
-  onReferenceClick 
+  onReferenceClick,
+  leftPaneWidth = 50,
+  isResizing = false,
+  onResizeStart,
 }: TraceabilityViewProps) {
   const { state } = useProject();
+  
+  // Helper function to find path in project tree
+  const findPath = (items: ProjectFileItem[], targetId: string, path: ProjectFileItem[] = []): ProjectFileItem[] | null => {
+    for (const item of items) {
+      const currentPath = [...path, item];
+      
+      if (item.id === targetId || item.file_id === targetId) {
+        return currentPath;
+      }
+      
+      if (item.children) {
+        const found = findPath(item.children, targetId, currentPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Build breadcrumb path for markdown file
+  const markdownBreadcrumb = useMemo(() => {
+    if (!state.projectFiles.length) {
+      return [];
+    }
+
+    // Find first markdown file in project tree
+    const findMarkdownFile = (items: ProjectFileItem[]): ProjectFileItem | null => {
+      for (const item of items) {
+        if (item.type === 'md') {
+          return item;
+        }
+        if (item.children) {
+          const found = findMarkdownFile(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const markdownFile = findMarkdownFile(state.projectFiles);
+    if (markdownFile) {
+      const path = findPath(state.projectFiles, markdownFile.id);
+      return path || [];
+    }
+    return [];
+  }, [state.projectFiles]);
+
+  // Build breadcrumb path for dafny file
+  const dafnyBreadcrumb = useMemo(() => {
+    if (!state.projectFiles.length) {
+      return [];
+    }
+
+    // Find first dafny file in project tree
+    const findDafnyFile = (items: ProjectFileItem[]): ProjectFileItem | null => {
+      for (const item of items) {
+        if (item.type === 'dfy') {
+          return item;
+        }
+        if (item.children) {
+          const found = findDafnyFile(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const dafnyFile = findDafnyFile(state.projectFiles);
+    if (dafnyFile) {
+      const path = findPath(state.projectFiles, dafnyFile.id);
+      return path || [];
+    }
+    return [];
+  }, [state.projectFiles]);
   
   // Get mappings from context or use empty array
   const referenceMappings = useMemo(() => {
@@ -115,8 +195,8 @@ export function TraceabilityView({
   // Parse markdown content to extract requirements for display
   const markdownContent = state.markdownContent || state.structuredSpec || '';
 
-  // Check if we have any data
-  const hasData = referenceMappings.length > 0 || state.dafnyCode;
+  // Check if we have any data (traceability matrix persists even when switching files)
+  const hasData = referenceMappings.length > 0 || state.traceabilityMatrix.length > 0 || state.dafnyCode;
 
   if (!hasData) {
     return (
@@ -135,7 +215,13 @@ export function TraceabilityView({
   return (
     <div className="flex h-full w-full">
       {/* Left Pane - Markdown with References */}
-      <div className="flex w-1/2 flex-col border-r border-border">
+      <div 
+        className={cn(
+          "flex flex-col border-r border-border transition-all duration-300",
+          isResizing && "transition-none"
+        )}
+        style={{ width: `${leftPaneWidth}%` }}
+      >
         {/* Tab Bar */}
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
@@ -153,11 +239,20 @@ export function TraceabilityView({
         </div>
 
         {/* Breadcrumb */}
-        <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
-          <span>Root Spec</span>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">Requirements.md</span>
-        </div>
+        {markdownBreadcrumb.length > 0 && (
+          <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
+            {markdownBreadcrumb.map((item, index) => (
+              <div key={item.id} className="flex items-center gap-1">
+                {index > 0 && <ChevronRight className="h-3 w-3" />}
+                <span className={cn(
+                  index === markdownBreadcrumb.length - 1 ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {item.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Markdown Content with References */}
         <div className="flex-1 overflow-auto">
@@ -196,7 +291,7 @@ export function TraceabilityView({
                 </section>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No requirement mappings found. Generate a specification to create traceability links.
+                  No requirement mappings found. Generate a formal specification to create traceability links between requirements and Dafny code.
                 </p>
               )}
 
@@ -217,19 +312,22 @@ export function TraceabilityView({
                             : "border-warning/50 bg-warning/10"
                         )}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2">
                           <span className={cn(
-                            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                            "rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0",
                             gap.severity === 'critical' ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
                           )}>
                             {gap.severity}
                           </span>
-                          <span className="text-foreground">{gap.description}</span>
+                          <span className="break-words text-foreground">{gap.description}</span>
                         </div>
                         {gap.suggestion && (
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Suggestion: {gap.suggestion}
-                          </p>
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-muted-foreground">Suggestion:</p>
+                            <p className="mt-1 break-words whitespace-pre-wrap text-xs text-muted-foreground">
+                              {gap.suggestion}
+                            </p>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -242,12 +340,23 @@ export function TraceabilityView({
       </div>
 
       {/* Resize Handle */}
-      <div className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50">
-        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary" />
-      </div>
+      {onResizeStart && (
+        <div 
+          className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
+          onMouseDown={onResizeStart}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary" />
+        </div>
+      )}
 
       {/* Right Pane - Dafny Code */}
-      <div className="flex w-1/2 flex-col">
+      <div 
+        className={cn(
+          "flex flex-col transition-all duration-300",
+          isResizing && "transition-none"
+        )}
+        style={{ width: `${100 - leftPaneWidth}%` }}
+      >
         {/* Tab Bar */}
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
@@ -262,11 +371,20 @@ export function TraceabilityView({
         </div>
 
         {/* Breadcrumb */}
-        <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
-          <span>Root Spec</span>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">Spec.dfy</span>
-        </div>
+        {dafnyBreadcrumb.length > 0 && (
+          <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
+            {dafnyBreadcrumb.map((item, index) => (
+              <div key={item.id} className="flex items-center gap-1">
+                {index > 0 && <ChevronRight className="h-3 w-3" />}
+                <span className={cn(
+                  index === dafnyBreadcrumb.length - 1 ? "text-foreground" : "text-muted-foreground"
+                )}>
+                  {item.name}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Code Area */}
         <div className="flex-1 overflow-auto">

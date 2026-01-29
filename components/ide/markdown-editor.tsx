@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
-import { FileText, ChevronRight, Sparkles, ArrowRight, Hash, List, CheckSquare, Layers, AlertTriangle, Edit3, Eye } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { FileText, ChevronRight, Sparkles, ArrowRight, Hash, List, CheckSquare, Layers, AlertTriangle, Edit3, Eye, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tooltip,
@@ -10,14 +10,49 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useProject } from "@/lib/project-context";
+import { useFileContext } from "@/lib/contexts/file-context";
+import { useAutoSave } from "@/lib/hooks/useAutoSave";
+import { SaveStatusIndicator } from "./save-status-indicator";
+import { SpecRefinementView } from "./spec-refinement-view";
+import { apiClient } from "@/lib/api-client";
+import type { TraceabilityLink } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface MarkdownEditorProps {
   onGenerateSpec: () => void;
   isGenerating?: boolean;
-  isRootFile?: boolean;
-  onDeconstructToUnits?: () => void;
-  isDeconstructing?: boolean;
+  isRootFile?: boolean;  // True if file has units (has been deconstructed)
+}
+
+// Unit Link Badge Component
+function UnitLinkBadge({ 
+  title, 
+  lineNumber, 
+  onClick 
+}: { 
+  title: string; 
+  lineNumber: number; 
+  onClick: () => void 
+}) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={onClick}
+            style={{ top: `${lineNumber * 1.5}em` }}
+            className="absolute -left-8 flex items-center gap-1 rounded bg-info/20 px-1.5 py-0.5 text-[10px] font-medium text-info transition-all hover:bg-info/30 hover:scale-105"
+          >
+            <Link2 className="h-2.5 w-2.5" />
+            <span className="max-w-[100px] truncate">{title}</span>
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="right">
+          <p className="text-xs">Click to open {title} Dafny file</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
 }
 
 // Simple markdown renderer for preview
@@ -136,37 +171,85 @@ function renderMarkdown(content: string): React.ReactNode {
 export function MarkdownEditor({ 
   onGenerateSpec, 
   isGenerating,
-  isRootFile = true,
-  onDeconstructToUnits,
-  isDeconstructing,
+  isRootFile = false,  // Default to false - only true if file has units
 }: MarkdownEditorProps) {
-  const { state, setMarkdownContent, saveFile } = useProject();
+  const { state: projectState, findGaps, refineSpec } = useProject();
+  const { state: fileState, updateFileContent, forceSaveCurrentFile, selectFile } = useFileContext();
   const [isEditing, setIsEditing] = useState(true);
-  const [localContent, setLocalContent] = useState(state.markdownContent);
+  const [traceabilityLinks, setTraceabilityLinks] = useState<TraceabilityLink[]>([]);
+  const [showRefinementView, setShowRefinementView] = useState(false);
+  
+  // Get current file content from activeFile
+  const currentContent = fileState.activeFile?.content ?? '';
+  
+  // Auto-save hook
+  const autoSave = useAutoSave({
+    fileId: fileState.activeFile?.id || null,
+    content: currentContent,
+    syncedContent: fileState.activeFile?.syncedContent ?? currentContent,
+    onSave: async () => {
+      if (fileState.activeFile) {
+        await forceSaveCurrentFile();
+      }
+    },
+    onSaveSuccess: () => {
+      // Success handled by hook
+    },
+    onSaveError: (error) => {
+      console.error('Auto-save failed:', error);
+    },
+  });
 
-  // Sync local content when context changes (e.g., after project creation)
-  useMemo(() => {
-    if (state.markdownContent !== localContent && !isEditing) {
-      setLocalContent(state.markdownContent);
+  // Fetch traceability links when viewing root file
+  useEffect(() => {
+    const fetchTraceability = async () => {
+      if (isRootFile && fileState.activeFile?.id) {
+        try {
+          const response = await apiClient.getTraceability(fileState.activeFile.id);
+          setTraceabilityLinks(response.links);
+        } catch (error) {
+          console.error('Failed to fetch traceability:', error);
+          setTraceabilityLinks([]);
+        }
+      } else {
+        setTraceabilityLinks([]);
+      }
+    };
+    
+    fetchTraceability();
+  }, [isRootFile, fileState.activeFile?.id]);
+
+  // Update content when activeFile changes
+  useEffect(() => {
+    if (fileState.activeFile && fileState.activeFile.fileType === 'md') {
+      // Content synced via activeFile
     }
-  }, [state.markdownContent]);
+  }, [fileState.activeFile]);
 
   const handleContentChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const newContent = e.target.value;
-    setLocalContent(newContent);
-    setMarkdownContent(newContent);
-  }, [setMarkdownContent]);
+    updateFileContent(newContent);
+  }, [updateFileContent]);
 
-  const handleSave = useCallback(async () => {
+  const handleForceSave = useCallback(async () => {
     try {
-      await saveFile('requirements.md', localContent, 'markdown');
+      await forceSaveCurrentFile();
     } catch (error) {
       console.error('Failed to save:', error);
     }
-  }, [saveFile, localContent]);
+  }, [forceSaveCurrentFile]);
 
-  // Use local content for display, fallback to context
-  const displayContent = localContent || state.markdownContent || defaultMarkdownContent;
+  const handleUnitLinkClick = useCallback(async (dafnyFileId: string) => {
+    try {
+      await selectFile(dafnyFileId);
+    } catch (error) {
+      console.error('Failed to open unit file:', error);
+    }
+  }, [selectFile]);
+
+  // Use activeFile content or fallback (only use default if content is null/undefined, not empty string)
+  const displayContent = currentContent !== null && currentContent !== undefined ? currentContent : defaultMarkdownContent;
+  const filename = fileState.activeFile?.filename || 'Requirements.md';
 
   return (
     <div className="flex h-full flex-col bg-background">
@@ -175,7 +258,13 @@ export function MarkdownEditor({
         <div className="flex items-center">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
             <FileText className="h-3.5 w-3.5 text-info" />
-            <span>Requirements.md</span>
+            <span>{filename}</span>
+            {fileState.activeFile && (
+              <SaveStatusIndicator 
+                status={autoSave.status} 
+                onRetry={autoSave.retrySave}
+              />
+            )}
             {isRootFile && (
               <span className="ml-1 rounded bg-warning/20 px-1 py-0.5 text-[10px] font-medium text-warning">
                 Root
@@ -210,14 +299,55 @@ export function MarkdownEditor({
         
         {/* Generate Button */}
         <div className="flex items-center gap-2 pr-2">
-          <Button
-            onClick={handleSave}
-            variant="ghost"
-            size="sm"
-            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-          >
-            Save
-          </Button>
+          {fileState.activeFile && autoSave.status !== 'clean' && (
+            <Button
+              onClick={handleForceSave}
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+              disabled={autoSave.status === 'saving'}
+            >
+              {autoSave.status === 'saving' ? 'Saving...' : 'Save'}
+            </Button>
+          )}
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={async () => {
+                    // Find gaps if not already found
+                    if (projectState.gaps.length === 0 && fileState.activeFile?.id) {
+                      try {
+                        await findGaps(displayContent, projectState.projectId || undefined, fileState.activeFile.id);
+                      } catch (error) {
+                        console.error("Failed to find gaps:", error);
+                      }
+                    }
+                    setShowRefinementView(true);
+                  }}
+                  disabled={projectState.isRefining || !displayContent.trim()}
+                  size="sm"
+                  variant="outline"
+                  className="h-7 gap-1.5 px-3 text-xs"
+                >
+                  <Edit3 className={`h-3.5 w-3.5 ${projectState.isRefining ? "animate-pulse" : ""}`} />
+                  <span>{projectState.isRefining ? "Refining..." : "Refine Spec"}</span>
+                  {projectState.gaps.length > 0 && (
+                    <span className="ml-1 rounded bg-warning/20 px-1 py-0.5 text-[10px] font-medium text-warning">
+                      {projectState.gaps.length}
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                <p>
+                  {projectState.gaps.length > 0 
+                    ? `Review and apply ${projectState.gaps.length} gap suggestion${projectState.gaps.length > 1 ? 's' : ''} before generating formal spec`
+                    : "Find and fix gaps in your specification"}
+                </p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <TooltipProvider delayDuration={0}>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -240,32 +370,21 @@ export function MarkdownEditor({
         </div>
       </div>
 
-      {/* Breadcrumb */}
-      <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
-        <span>Root Spec</span>
-        <ChevronRight className="h-3 w-3" />
-        <span className="text-foreground">Requirements.md</span>
-      </div>
+      {/* Breadcrumb - only show "Root Spec" if file has units */}
+      {isRootFile && (
+        <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
+          <span>Root Spec</span>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-foreground">{filename}</span>
+        </div>
+      )}
 
-      {/* Deconstruction Action Bar (for Root MD files in Edit mode) */}
-      {isRootFile && onDeconstructToUnits && (
-        <div className="flex items-center justify-between border-b border-border bg-gradient-to-r from-accent-violet-muted to-primary/10 px-4 py-2">
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-warning" />
-            <span className="text-xs text-muted-foreground">
-              This is a root specification file. Break it down into provable units for verification.
-            </span>
-          </div>
-          <Button
-            onClick={onDeconstructToUnits}
-            disabled={isDeconstructing}
-            size="sm"
-            variant="outline"
-            className="h-7 gap-1.5 border-accent-violet/50 bg-accent-violet-muted px-3 text-xs font-medium text-accent-violet hover:bg-accent-violet/30 hover:text-accent-violet"
-          >
-            <Layers className={`h-3.5 w-3.5 ${isDeconstructing ? "animate-pulse" : ""}`} />
-            <span>{isDeconstructing ? "Deconstructing..." : "Deconstruct to Units"}</span>
-          </Button>
+      {/* Root badge indicator - shows when file has units */}
+      {isRootFile && (
+        <div className="flex items-center gap-2 border-b border-border bg-secondary/20 px-4 py-1.5">
+          <span className="text-xs text-muted-foreground">
+            This specification has been broken down into verifiable units.
+          </span>
         </div>
       )}
 
@@ -275,13 +394,12 @@ export function MarkdownEditor({
           <button 
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             onClick={() => {
-              const textarea = document.querySelector('textarea');
+              const textarea = document.querySelector('textarea') as HTMLTextAreaElement;
               if (textarea) {
                 const start = textarea.selectionStart;
                 const end = textarea.selectionEnd;
-                const newContent = localContent.slice(0, start) + '# ' + localContent.slice(end);
-                setLocalContent(newContent);
-                setMarkdownContent(newContent);
+                const newContent = displayContent.slice(0, start) + '# ' + displayContent.slice(end);
+                updateFileContent(newContent);
               }
             }}
           >
@@ -305,21 +423,31 @@ export function MarkdownEditor({
         {isEditing ? (
           /* Edit Mode - Textarea */
           <textarea
-            value={localContent || displayContent}
+            value={displayContent}
             onChange={handleContentChange}
             placeholder="Write your requirements specification in Markdown..."
             className="h-full w-full resize-none bg-transparent p-6 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             spellCheck={false}
           />
         ) : (
-          /* Preview Mode - Rendered Markdown */
-          <div className="mx-auto max-w-3xl px-8 py-6">
+          /* Preview Mode - Rendered Markdown with Ghost Link Badges */
+          <div className="relative ml-0 max-w-3xl px-8 py-6">
+            {/* Ghost Link Badges - positioned absolutely based on line numbers */}
+            {traceabilityLinks.length > 0 && traceabilityLinks.map((link) => (
+              <UnitLinkBadge
+                key={link.unit_id}
+                title={link.title}
+                lineNumber={link.source_range.start_line}
+                onClick={() => handleUnitLinkClick(link.dafny_file_id)}
+              />
+            ))}
             <article className="prose prose-invert prose-sm max-w-none">
               {renderMarkdown(displayContent)}
             </article>
           </div>
         )}
       </div>
+      <SpecRefinementView open={showRefinementView} onClose={() => setShowRefinementView(false)} />
     </div>
   );
 }

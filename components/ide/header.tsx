@@ -1,7 +1,6 @@
 "use client";
 
-import { Shield, Wallet, Play, ChevronDown, Settings, HelpCircle, Github, Eye, Edit3 } from "lucide-react";
-import { ThemeToggle } from "@/components/theme-toggle";
+import { Play, ChevronDown, HelpCircle, Eye, Edit3, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -10,7 +9,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserMenu } from "@/components/auth/user-menu";
+import { LoginModal } from "@/components/auth/login-modal";
+import { useAuth } from "@/lib/auth-context";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { useTheme } from "next-themes";
 
 export type ViewMode = "trace" | "edit";
 
@@ -31,16 +36,34 @@ export function Header({
   viewMode = "edit",
   onViewModeChange,
 }: HeaderProps) {
+  const { isAuthenticated, login } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  // Prevent hydration mismatch by only using theme after mount
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   return (
-    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-4">
+    <>
+    <LoginModal 
+      open={showLoginModal} 
+      onOpenChange={setShowLoginModal}
+      trigger="general"
+    />
+    <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-1">
       {/* Left: Logo */}
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded bg-primary/20">
-            <Shield className="h-4 w-4 text-primary" />
-          </div>
-          <span className="text-sm font-semibold tracking-tight text-foreground">Guardian Gateway</span>
-        </div>
+      <div className="flex items-center gap-1">
+        <Image
+          src={mounted && resolvedTheme === "dark" ? "/logo-dark.png" : "/logo.png"}
+          alt="Guardian Gateway Logo"
+          width={64}
+          height={64}
+          className="h-18 w-18 object-contain"
+          priority
+        />
 
         {/* Navigation */}
         {hasProject && (
@@ -131,24 +154,32 @@ export function Header({
 
       {/* Right: Actions */}
       <div className="flex items-center gap-2">
-        <Button variant="ghost" size="sm" className="hidden h-7 w-7 p-0 text-muted-foreground hover:text-foreground sm:flex">
-          <Github className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" className="hidden h-7 w-7 p-0 text-muted-foreground hover:text-foreground sm:flex">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="hidden h-7 w-7 p-0 text-muted-foreground hover:text-foreground sm:flex"
+          onClick={() => window.open('https://docs.example.com', '_blank')}
+          title="Documentation"
+        >
           <HelpCircle className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="sm" className="hidden h-7 w-7 p-0 text-muted-foreground hover:text-foreground sm:flex">
-          <Settings className="h-4 w-4" />
-        </Button>
-        
-        <ThemeToggle />
 
         <div className="mx-2 hidden h-4 w-px bg-border sm:block" />
 
-        <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground">
-          <Wallet className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">Connect Wallet</span>
-        </Button>
+        {/* Auth Button or User Menu */}
+        {isAuthenticated ? (
+          <UserMenu />
+        ) : (
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="h-7 gap-1.5 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => setShowLoginModal(true)}
+          >
+            <Github className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Sign in with GitHub</span>
+          </Button>
+        )}
 
         {hasProject && showVerification && (
           <Button
@@ -163,5 +194,6 @@ export function Header({
         )}
       </div>
     </header>
+    </>
   );
 }
