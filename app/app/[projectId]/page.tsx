@@ -16,6 +16,7 @@ import { TraceabilityView } from "@/components/ide/traceability-view";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CheckCircle2, Sparkles, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export default function ProjectPage() {
   const params = useParams();
@@ -87,6 +88,26 @@ export default function ProjectPage() {
       await generateSpec(markdownContent, fileState.activeFile.id, fileState.activeFile.filename);
     }
   }, [generateSpec, fileState.activeFile]);
+
+  // Show toast notification when spec generation completes
+  const prevIsGenerating = useRef(projectState.isGenerating);
+  useEffect(() => {
+    // Detect transition from generating to not generating
+    if (prevIsGenerating.current && !projectState.isGenerating) {
+      // Check if we have traceability data (indicates successful generation)
+      if (projectState.traceabilityMatrix.length > 0 || projectState.generatedSpec) {
+        toast.success('Specification generated!', {
+          description: `${projectState.traceabilityMatrix.length} requirements mapped`,
+          action: {
+            label: 'View Trace',
+            onClick: () => setViewMode('trace'),
+          },
+          duration: 6000,
+        });
+      }
+    }
+    prevIsGenerating.current = projectState.isGenerating;
+  }, [projectState.isGenerating, projectState.traceabilityMatrix.length, projectState.generatedSpec]);
 
   const handleFileSelect = useCallback((fileId: string) => {
     selectFile(fileId);
