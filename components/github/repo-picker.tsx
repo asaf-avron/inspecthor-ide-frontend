@@ -146,14 +146,14 @@ export function RepoPicker() {
       {/* Import Form */}
       {selectedRepo && !selectedRepo.project_id && (
         <div className="border-t pt-4">
-          <h4 className="text-sm font-medium mb-2">Import as Project</h4>
+          <h4 className="text-sm font-medium mb-2">Import as Workspace</h4>
           <div className="space-y-3">
             <div>
-              <label className="text-sm text-muted-foreground">Project Name</label>
+              <label className="text-sm text-muted-foreground">Workspace name</label>
               <Input
                 value={projectName}
                 onChange={(e) => setProjectName(e.target.value)}
-                placeholder="Enter project name"
+                placeholder="Enter workspace name"
                 className="mt-1"
               />
             </div>

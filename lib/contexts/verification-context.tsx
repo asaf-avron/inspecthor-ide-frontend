@@ -79,7 +79,7 @@ function verificationReducer(state: VerificationState, action: VerificationActio
 // === Context Type ===
 interface VerificationContextType {
     state: VerificationState;
-    runVerification: (dafnyCode: string) => Promise<void>;
+    runVerification: (dafnyCode: string) => Promise<VerifyResponse | undefined>;
 }
 
 // === Context ===
@@ -89,7 +89,7 @@ const VerificationContext = createContext<VerificationContextType | null>(null);
 export function VerificationProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(verificationReducer, initialState);
 
-    const runVerification = useCallback(async (dafnyCode: string) => {
+    const runVerification = useCallback(async (dafnyCode: string): Promise<VerifyResponse | undefined> => {
         dispatch({ type: 'SET_VERIFYING', payload: true });
         
         try {
@@ -100,8 +100,8 @@ export function VerificationProvider({ children }: { children: ReactNode }) {
             });
             
             dispatch({ type: 'SET_VERIFICATION_RESULTS', payload: response });
+            return response;
         } catch (error) {
-            // On error, still set verifying to false
             dispatch({ type: 'SET_VERIFYING', payload: false });
             throw error;
         } finally {

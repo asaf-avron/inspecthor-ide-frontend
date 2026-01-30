@@ -59,7 +59,7 @@ const defaultProofObligations: ProofObligation[] = [
 ];
 
 export function VerificationPanel() {
-  const { state: projectState } = useProject();
+  const { state: projectState, addLog } = useProject();
   const { state: fileState } = useFileContext();
   const { state: verificationState, runVerification } = useVerificationContext();
 
@@ -92,7 +92,13 @@ export function VerificationPanel() {
 
   const handleRunVerification = async () => {
     if (dafnyCode) {
-      await runVerification(dafnyCode);
+      const response = await runVerification(dafnyCode);
+      if (response?.guardian_status === "REJECTED_BY_ARCHITECT") {
+        addLog(
+          "error",
+          `REJECTED_BY_ARCHITECT: ${response.guardian_reason ?? "Code rejected by Guardian AST gate."}`
+        );
+      }
     }
   };
 
@@ -142,13 +148,17 @@ export function VerificationPanel() {
 
           {/* Verification Results Summary */}
           {verificationState.verificationResults && (
-            <div className={`mt-2 rounded px-2 py-1 text-xs ${verificationState.verificationResults.verified
-                ? "bg-primary/20 text-primary"
-                : "bg-destructive/20 text-destructive"
+            <div className={`mt-2 rounded px-2 py-1 text-xs ${verificationState.verificationResults.guardian_status === "REJECTED_BY_ARCHITECT"
+                ? "bg-destructive/20 text-destructive"
+                : verificationState.verificationResults.verified
+                  ? "bg-primary/20 text-primary"
+                  : "bg-destructive/20 text-destructive"
               }`}>
-              {verificationState.verificationResults.verified
-                ? `Verification passed in ${verificationState.verificationResults.verification_time_ms}ms`
-                : `Verification failed: ${verificationState.verificationResults.errors.length} errors`
+              {verificationState.verificationResults.guardian_status === "REJECTED_BY_ARCHITECT"
+                ? `REJECTED_BY_ARCHITECT: ${verificationState.verificationResults.guardian_reason ?? "Code rejected by Guardian AST gate."}`
+                : verificationState.verificationResults.verified
+                  ? `Verification passed in ${verificationState.verificationResults.verification_time_ms}ms`
+                  : `Verification failed: ${verificationState.verificationResults.errors.length} errors`
               }
             </div>
           )}

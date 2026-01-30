@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
     Dialog,
     DialogContent,
@@ -18,23 +18,38 @@ interface CreateProjectModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onCreateProject: (name: string, description?: string) => Promise<void>;
+    initialName?: string;
+    initialDescription?: string;
 }
 
 export function CreateProjectModal({ 
     open, 
     onOpenChange, 
-    onCreateProject 
+    onCreateProject,
+    initialName,
+    initialDescription,
 }: CreateProjectModalProps) {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [isCreating, setIsCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    useEffect(() => {
+        if (open && initialName !== undefined) {
+            setName(initialName);
+            setDescription(initialDescription ?? "");
+        }
+        if (!open) {
+            setName("");
+            setDescription("");
+        }
+    }, [open, initialName, initialDescription]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
         if (!name.trim()) {
-            setError("Project name is required");
+            setError("Workspace name is required");
             return;
         }
 
@@ -48,7 +63,7 @@ export function CreateProjectModal({
             setDescription("");
             onOpenChange(false);
         } catch (error) {
-            setError(error instanceof Error ? error.message : "Failed to create project");
+            setError(error instanceof Error ? error.message : "Failed to create workspace");
         } finally {
             setIsCreating(false);
         }
@@ -68,9 +83,9 @@ export function CreateProjectModal({
             <DialogContent className="sm:max-w-md">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>Create New Project</DialogTitle>
+                        <DialogTitle>New Workspace</DialogTitle>
                         <DialogDescription>
-                            Start a new formal verification project with a blank canvas
+                            Start a new workspace for formal verification
                         </DialogDescription>
                     </DialogHeader>
 
@@ -125,7 +140,7 @@ export function CreateProjectModal({
                                     Creating...
                                 </>
                             ) : (
-                                "Create Project"
+                                "Create Workspace"
                             )}
                         </Button>
                     </DialogFooter>

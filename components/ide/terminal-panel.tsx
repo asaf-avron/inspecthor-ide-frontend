@@ -66,6 +66,10 @@ export function TerminalPanel({ isCollapsed, onToggle, isGenerating, height = 19
           <span className="text-xs text-muted-foreground">
             — {isGenerating ? 'Generating...' : state.isVerifying ? 'Verifying...' : 'Output'}
           </span>
+          <span className="text-xs text-muted-foreground/70">·</span>
+          <span className="text-xs text-muted-foreground" title="High Court of truth">
+            Dafny Verification Engine — {state.isVerifying ? 'Verifying...' : 'Standing by'}
+          </span>
           {(isGenerating || state.isVerifying) && (
             <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
           )}

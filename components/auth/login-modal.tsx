@@ -31,9 +31,9 @@ export function LoginModal({ open, onOpenChange, trigger = 'general' }: LoginMod
             case 'verify':
                 return 'Sign in to run Dafny verification';
             case 'save':
-                return 'Sign in to save projects to the cloud';
+                return 'Sign in to save workspaces to the cloud';
             case 'export':
-                return 'Sign in to export projects to GitHub';
+                return 'Sign in to export workspaces to GitHub';
             default:
                 return 'Sign in to unlock all features';
         }
@@ -81,7 +81,7 @@ export function LoginModal({ open, onOpenChange, trigger = 'general' }: LoginMod
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="text-primary">✓</span>
-                                5 cloud projects
+                                5 cloud workspaces
                             </li>
                             <li className="flex items-center gap-2">
                                 <span className="text-primary">✓</span>

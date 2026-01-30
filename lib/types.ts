@@ -143,6 +143,9 @@ export interface VerifyResponse {
     errors: VerificationError[];
     warnings: Record<string, unknown>[];
     solver_output: string;
+    /** Set when Guardian AST gate rejects Python before transpilation */
+    guardian_status?: "OK" | "REJECTED_BY_ARCHITECT";
+    guardian_reason?: string;
 }
 
 // Legacy verify endpoint (simpler)

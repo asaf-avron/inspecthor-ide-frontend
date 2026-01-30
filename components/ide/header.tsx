@@ -77,7 +77,7 @@ export function Header({
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start">
                   <DropdownMenuItem>New Specification</DropdownMenuItem>
-                  <DropdownMenuItem>Open Project...</DropdownMenuItem>
+                  <DropdownMenuItem>Open Workspace...</DropdownMenuItem>
                   <DropdownMenuItem>Open Recent</DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem>Save</DropdownMenuItem>

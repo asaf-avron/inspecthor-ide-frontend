@@ -73,12 +73,17 @@ export default function ProjectPage() {
 
   const handleRunVerification = useCallback(async () => {
     setIsTerminalCollapsed(false);
-    // Get Dafny code from active file
     const dafnyCode = fileState.activeFile?.fileType === 'dfy' ? fileState.activeFile.content : '';
     if (dafnyCode) {
-      await runVerification(dafnyCode);
+      const response = await runVerification(dafnyCode);
+      if (response?.guardian_status === "REJECTED_BY_ARCHITECT") {
+        addLog(
+          "error",
+          `REJECTED_BY_ARCHITECT: ${response.guardian_reason ?? "Code rejected by Guardian AST gate."}`
+        );
+      }
     }
-  }, [runVerification, fileState.activeFile]);
+  }, [runVerification, fileState.activeFile, addLog]);
 
   const handleGenerateSpec = useCallback(async () => {
     setIsTerminalCollapsed(false);
