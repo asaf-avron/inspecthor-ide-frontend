@@ -70,17 +70,35 @@ function ReferenceBadge({
 }
 
 function CodeLine({ line }: { line: string }) {
-  // Using CSS variables for theme-aware syntax highlighting
-  const highlightedLine = line
-    .replace(/(\/\/.*$)/g, '<span class="text-syntax-comment">$1</span>')
-    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-syntax-keyword">$1</span>')
-    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-syntax-type">$1</span>')
-    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-syntax-function">$1</span>')
-    .replace(/(".*?")/g, '<span class="text-syntax-string">$1</span>')
-    .replace(/\b(\d+)\b/g, '<span class="text-syntax-number">$1</span>');
+  // Safe syntax highlighting using placeholders to prevent regex collisions
+  const placeholders: string[] = [];
+  const encode = (str: string, cls: string) => {
+    placeholders.push(`<span class='text-syntax-${cls}'>${str}</span>`);
+    return `__PH_${placeholders.length - 1}__`;
+  };
+
+  let processed = line;
+
+  // 1. Extract strings (Priority over comments to avoid // inside string)
+  processed = processed.replace(/(".*?")/g, (match) => encode(match, 'string'));
+
+  // 2. Extract comments
+  processed = processed.replace(/(\/\/.*$)/g, (match) => encode(match, 'comment'));
+
+  // 3. Highlight Keywords (now safe from colliding with strings/comments)
+  processed = processed
+    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, "<span class='text-syntax-keyword'>$1</span>")
+    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, "<span class='text-syntax-type'>$1</span>")
+    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, "<span class='text-syntax-function'>$1</span>")
+    .replace(/\b(\d+)\b/g, "<span class='text-syntax-number'>$1</span>");
+
+  // 4. Restore placeholders in REVERSE order (to handle nesting like strings inside comments)
+  for (let i = placeholders.length - 1; i >= 0; i--) {
+    processed = processed.replace(`__PH_${i}__`, placeholders[i]);
+  }
 
   return (
-    <code dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }} />
+    <code dangerouslySetInnerHTML={{ __html: processed || "&nbsp;" }} />
   );
 }
 
