@@ -25,9 +25,11 @@ interface TerminalPanelProps {
   isCollapsed: boolean;
   onToggle: () => void;
   isGenerating?: boolean;
+  height?: number; // Height in pixels when not collapsed
+  isResizing?: boolean; // Whether currently being resized
 }
 
-export function TerminalPanel({ isCollapsed, onToggle, isGenerating }: TerminalPanelProps) {
+export function TerminalPanel({ isCollapsed, onToggle, isGenerating, height = 192, isResizing = false }: TerminalPanelProps) {
   const { state, clearLogs, addLog } = useProject();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +54,10 @@ export function TerminalPanel({ isCollapsed, onToggle, isGenerating }: TerminalP
   };
 
   return (
-    <div className={`flex flex-col border-t border-border bg-background transition-all ${isCollapsed ? "h-9" : "h-48"}`}>
+    <div 
+      className={`flex flex-col border-t border-border bg-background ${isCollapsed ? "h-9 transition-all" : isResizing ? "" : "transition-all"}`}
+      style={!isCollapsed && height ? { height: `${height}px` } : undefined}
+    >
       {/* Header */}
       <div className="flex h-9 shrink-0 items-center justify-between border-b border-border bg-secondary/30 px-3">
         <div className="flex items-center gap-2">

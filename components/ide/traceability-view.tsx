@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import type React from "react";
 import { FileText, ChevronRight, GripVertical, Eye, Bookmark, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,22 +10,26 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useProject } from "@/lib/project-context";
-import type { ReferenceMapping } from "@/lib/types";
+import type { ReferenceMapping, ProjectFileItem } from "@/lib/types";
 
 interface TraceabilityViewProps {
   selectedFile: string;
   activeReference: string | null;
   onReferenceClick: (refId: string | null) => void;
+  leftPaneWidth?: number; // Percentage width for left pane (default 50)
+  isResizing?: boolean;
+  onResizeStart?: (e: React.MouseEvent) => void;
+  projectFiles?: ProjectFileItem[]; // File tree for breadcrumbs
 }
 
-function ReferenceBadge({ 
-  refId, 
-  isActive, 
+function ReferenceBadge({
+  refId,
+  isActive,
   onClick,
   mapping
-}: { 
-  refId: string; 
-  isActive: boolean; 
+}: {
+  refId: string;
+  isActive: boolean;
   onClick: () => void;
   mapping: ReferenceMapping;
 }) {
@@ -35,8 +40,8 @@ function ReferenceBadge({
           onClick={onClick}
           className={cn(
             "ml-2 inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-medium transition-all",
-            isActive 
-              ? "bg-info/30 text-info ring-1 ring-info/50" 
+            isActive
+              ? "bg-info/30 text-info ring-1 ring-info/50"
               : "bg-info-muted text-info hover:bg-info/30"
           )}
         >
@@ -65,27 +70,122 @@ function ReferenceBadge({
 }
 
 function CodeLine({ line }: { line: string }) {
-  // Using CSS variables for theme-aware syntax highlighting
-  const highlightedLine = line
-    .replace(/(\/\/.*$)/g, '<span class="text-syntax-comment">$1</span>')
-    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, '<span class="text-syntax-keyword">$1</span>')
-    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, '<span class="text-syntax-type">$1</span>')
-    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, '<span class="text-syntax-function">$1</span>')
-    .replace(/(".*?")/g, '<span class="text-syntax-string">$1</span>')
-    .replace(/\b(\d+)\b/g, '<span class="text-syntax-number">$1</span>');
+  // Safe syntax highlighting using placeholders to prevent regex collisions
+  const placeholders: string[] = [];
+  const encode = (str: string, cls: string) => {
+    placeholders.push(`<span class='text-syntax-${cls}'>${str}</span>`);
+    return `__PH_${placeholders.length - 1}__`;
+  };
+
+  let processed = line;
+
+  // 1. Extract strings (Priority over comments to avoid // inside string)
+  processed = processed.replace(/(".*?")/g, (match) => encode(match, 'string'));
+
+  // 2. Extract comments
+  processed = processed.replace(/(\/\/.*$)/g, (match) => encode(match, 'comment'));
+
+  // 3. Highlight Keywords (now safe from colliding with strings/comments)
+  processed = processed
+    .replace(/\b(module|datatype|predicate|method|lemma|function|returns|requires|ensures|forall|exists|calc|include|var|if|else|while|match|case|ghost|class|trait|type|const)\b/g, "<span class='text-syntax-keyword'>$1</span>")
+    .replace(/\b(map|seq|set|multiset|array|int|nat|real|bool|string|char|object)\b/g, "<span class='text-syntax-type'>$1</span>")
+    .replace(/\b(true|false|null|old|fresh|in|this)\b/g, "<span class='text-syntax-function'>$1</span>")
+    .replace(/\b(\d+)\b/g, "<span class='text-syntax-number'>$1</span>");
+
+  // 4. Restore placeholders in REVERSE order (to handle nesting like strings inside comments)
+  for (let i = placeholders.length - 1; i >= 0; i--) {
+    processed = processed.replace(`__PH_${i}__`, placeholders[i]);
+  }
 
   return (
-    <code dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }} />
+    <code dangerouslySetInnerHTML={{ __html: processed || "&nbsp;" }} />
   );
 }
 
-export function TraceabilityView({ 
-  selectedFile, 
-  activeReference, 
-  onReferenceClick 
+export function TraceabilityView({
+  selectedFile,
+  activeReference,
+  onReferenceClick,
+  leftPaneWidth = 50,
+  isResizing = false,
+  onResizeStart,
+  projectFiles = [],
 }: TraceabilityViewProps) {
   const { state } = useProject();
-  
+
+  // Helper function to find path in project tree
+  const findPath = (items: ProjectFileItem[], targetId: string, path: ProjectFileItem[] = []): ProjectFileItem[] | null => {
+    for (const item of items) {
+      const currentPath = [...path, item];
+
+      if (item.id === targetId || item.file_id === targetId) {
+        return currentPath;
+      }
+
+      if (item.children) {
+        const found = findPath(item.children, targetId, currentPath);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  // Build breadcrumb path for markdown file
+  const markdownBreadcrumb = useMemo(() => {
+    if (!projectFiles || !projectFiles.length) {
+      return [];
+    }
+
+    // Find first markdown file in project tree
+    const findMarkdownFile = (items: ProjectFileItem[]): ProjectFileItem | null => {
+      for (const item of items) {
+        if (item.type === 'md') {
+          return item;
+        }
+        if (item.children) {
+          const found = findMarkdownFile(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const markdownFile = findMarkdownFile(projectFiles);
+    if (markdownFile) {
+      const path = findPath(projectFiles, markdownFile.id);
+      return path || [];
+    }
+    return [];
+  }, [projectFiles]);
+
+  // Build breadcrumb path for dafny file
+  const dafnyBreadcrumb = useMemo(() => {
+    if (!projectFiles || !projectFiles.length) {
+      return [];
+    }
+
+    // Find first dafny file in project tree
+    const findDafnyFile = (items: ProjectFileItem[]): ProjectFileItem | null => {
+      for (const item of items) {
+        if (item.type === 'dfy') {
+          return item;
+        }
+        if (item.children) {
+          const found = findDafnyFile(item.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const dafnyFile = findDafnyFile(projectFiles);
+    if (dafnyFile) {
+      const path = findPath(projectFiles, dafnyFile.id);
+      return path || [];
+    }
+    return [];
+  }, [projectFiles]);
+
   // Get mappings from context or use empty array
   const referenceMappings = useMemo(() => {
     if (state.referenceMappings.length > 0) {
@@ -96,9 +196,9 @@ export function TraceabilityView({
       return state.traceabilityMatrix.map((entry, i) => ({
         id: entry.id || `REF-${i + 1}`,
         markdownText: entry.source_text,
-        dafnyLines: { 
-          start: entry.line_number || 1, 
-          end: (entry.line_number || 1) + 5 
+        dafnyLines: {
+          start: entry.line_number || 1,
+          end: (entry.line_number || 1) + 5
         },
         dafnyCode: entry.code_line,
       }));
@@ -107,16 +207,35 @@ export function TraceabilityView({
   }, [state.referenceMappings, state.traceabilityMatrix]);
 
   const activeMapping = referenceMappings.find(m => m.id === activeReference);
-  
-  // Use dafny code from context
-  const dafnyCode = state.dafnyCode || defaultDafnyCode;
+
+  // Use dafny code from generated spec
+  const dafnyCode = state.generatedSpec?.dafny_skeleton || defaultDafnyCode;
   const codeLines = dafnyCode.split("\n");
 
   // Parse markdown content to extract requirements for display
-  const markdownContent = state.markdownContent || state.structuredSpec || '';
+  const markdownContent = state.generatedSpec?.structured_spec || '';
 
-  // Check if we have any data
-  const hasData = referenceMappings.length > 0 || state.dafnyCode;
+  // Derive actual filenames from project files or use defaults
+  const markdownFileName = useMemo(() => {
+    if (markdownBreadcrumb.length > 0) {
+      return markdownBreadcrumb[markdownBreadcrumb.length - 1].name;
+    }
+    return state.generatedSpec?.suggested_filename
+      ? `${state.generatedSpec.suggested_filename}.md`
+      : 'Requirements.md';
+  }, [markdownBreadcrumb, state.generatedSpec?.suggested_filename]);
+
+  const dafnyFileName = useMemo(() => {
+    if (dafnyBreadcrumb.length > 0) {
+      return dafnyBreadcrumb[dafnyBreadcrumb.length - 1].name;
+    }
+    return state.generatedSpec?.suggested_filename
+      ? `${state.generatedSpec.suggested_filename}.dfy`
+      : 'Spec.dfy';
+  }, [dafnyBreadcrumb, state.generatedSpec?.suggested_filename]);
+
+  // Check if we have any data (traceability matrix persists even when switching files)
+  const hasData = referenceMappings.length > 0 || state.traceabilityMatrix.length > 0 || state.generatedSpec?.dafny_skeleton;
 
   if (!hasData) {
     return (
@@ -135,12 +254,18 @@ export function TraceabilityView({
   return (
     <div className="flex h-full w-full">
       {/* Left Pane - Markdown with References */}
-      <div className="flex w-1/2 flex-col border-r border-border">
+      <div
+        className={cn(
+          "flex flex-col border-r border-border transition-all duration-300",
+          isResizing && "transition-none"
+        )}
+        style={{ width: `${leftPaneWidth}%` }}
+      >
         {/* Tab Bar */}
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
             <FileText className="h-3.5 w-3.5 text-info" />
-            <span>Requirements.md</span>
+            <span>{markdownFileName}</span>
           </div>
           <span className="ml-2 rounded bg-info-muted px-1.5 py-0.5 text-[10px] font-medium text-info">
             Trace Mode
@@ -152,12 +277,7 @@ export function TraceabilityView({
           )}
         </div>
 
-        {/* Breadcrumb */}
-        <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
-          <span>Root Spec</span>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">Requirements.md</span>
-        </div>
+        {/* Breadcrumb removed */}
 
         {/* Markdown Content with References */}
         <div className="flex-1 overflow-auto">
@@ -182,9 +302,9 @@ export function TraceabilityView({
                             <span className="text-sm text-muted-foreground">
                               {mapping.markdownText}
                             </span>
-                            <ReferenceBadge 
-                              refId={mapping.id} 
-                              isActive={activeReference === mapping.id} 
+                            <ReferenceBadge
+                              refId={mapping.id}
+                              isActive={activeReference === mapping.id}
                               onClick={() => onReferenceClick(activeReference === mapping.id ? null : mapping.id)}
                               mapping={mapping}
                             />
@@ -196,7 +316,7 @@ export function TraceabilityView({
                 </section>
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  No requirement mappings found. Generate a specification to create traceability links.
+                  No requirement mappings found. Generate a formal specification to create traceability links between requirements and Dafny code.
                 </p>
               )}
 
@@ -208,28 +328,31 @@ export function TraceabilityView({
                   </h2>
                   <div className="space-y-2">
                     {state.gaps.map((gap) => (
-                      <div 
-                        key={gap.id} 
+                      <div
+                        key={gap.id}
                         className={cn(
                           "rounded-lg border p-3 text-sm",
-                          gap.severity === 'critical' 
-                            ? "border-destructive/50 bg-destructive/10" 
+                          gap.severity === 'critical'
+                            ? "border-destructive/50 bg-destructive/10"
                             : "border-warning/50 bg-warning/10"
                         )}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-start gap-2">
                           <span className={cn(
-                            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                            "rounded px-1.5 py-0.5 text-[10px] font-medium shrink-0",
                             gap.severity === 'critical' ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
                           )}>
                             {gap.severity}
                           </span>
-                          <span className="text-foreground">{gap.description}</span>
+                          <span className="break-words text-foreground">{gap.description}</span>
                         </div>
                         {gap.suggestion && (
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            Suggestion: {gap.suggestion}
-                          </p>
+                          <div className="mt-2">
+                            <p className="text-xs font-medium text-muted-foreground">Suggestion:</p>
+                            <p className="mt-1 break-words whitespace-pre-wrap text-xs text-muted-foreground">
+                              {gap.suggestion}
+                            </p>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -242,17 +365,28 @@ export function TraceabilityView({
       </div>
 
       {/* Resize Handle */}
-      <div className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50">
-        <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary" />
-      </div>
+      {onResizeStart && (
+        <div
+          className="group flex w-1 cursor-col-resize items-center justify-center bg-border/50 transition-colors hover:bg-primary/50 active:bg-primary/70"
+          onMouseDown={onResizeStart}
+        >
+          <GripVertical className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary" />
+        </div>
+      )}
 
       {/* Right Pane - Dafny Code */}
-      <div className="flex w-1/2 flex-col">
+      <div
+        className={cn(
+          "flex flex-col transition-all duration-300",
+          isResizing && "transition-none"
+        )}
+        style={{ width: `${100 - leftPaneWidth}%` }}
+      >
         {/* Tab Bar */}
         <div className="flex h-9 items-center border-b border-border bg-secondary/30">
           <div className="flex h-9 items-center gap-2 border-r border-border bg-background px-3 text-xs text-foreground">
             <div className="h-3.5 w-3.5 rounded bg-primary/80" />
-            <span>Spec.dfy</span>
+            <span>{dafnyFileName}</span>
           </div>
           {activeMapping && (
             <span className="ml-2 text-[10px] text-muted-foreground">
@@ -261,12 +395,7 @@ export function TraceabilityView({
           )}
         </div>
 
-        {/* Breadcrumb */}
-        <div className="flex h-6 items-center gap-1 border-b border-border bg-secondary/20 px-3 text-[11px] text-muted-foreground">
-          <span>Root Spec</span>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground">Spec.dfy</span>
-        </div>
+        {/* Breadcrumb removed */}
 
         {/* Code Area */}
         <div className="flex-1 overflow-auto">
@@ -275,12 +404,12 @@ export function TraceabilityView({
             <div className="sticky left-0 flex flex-col bg-background pr-2 text-right text-muted-foreground/60 select-none">
               {codeLines.map((_, i) => {
                 const lineNum = i + 1;
-                const isHighlighted = activeMapping && 
-                  lineNum >= activeMapping.dafnyLines.start && 
+                const isHighlighted = activeMapping &&
+                  lineNum >= activeMapping.dafnyLines.start &&
                   lineNum <= activeMapping.dafnyLines.end;
                 return (
-                  <div 
-                    key={i} 
+                  <div
+                    key={i}
                     className={cn(
                       "px-3",
                       isHighlighted && "bg-info-muted text-info"
@@ -297,13 +426,13 @@ export function TraceabilityView({
               <pre className="text-foreground">
                 {codeLines.map((line, i) => {
                   const lineNum = i + 1;
-                  const isHighlighted = activeMapping && 
-                    lineNum >= activeMapping.dafnyLines.start && 
+                  const isHighlighted = activeMapping &&
+                    lineNum >= activeMapping.dafnyLines.start &&
                     lineNum <= activeMapping.dafnyLines.end;
-                  const isCollapsed = activeMapping && 
-                    (lineNum < activeMapping.dafnyLines.start - 2 || 
-                     lineNum > activeMapping.dafnyLines.end + 2);
-                  
+                  const isCollapsed = activeMapping &&
+                    (lineNum < activeMapping.dafnyLines.start - 2 ||
+                      lineNum > activeMapping.dafnyLines.end + 2);
+
                   // Show collapsed indicator
                   if (activeMapping && isCollapsed) {
                     // Show collapse indicator at start and end boundaries
@@ -318,11 +447,11 @@ export function TraceabilityView({
                   }
 
                   return (
-                    <div 
-                      key={i} 
+                    <div
+                      key={i}
                       className={cn(
-                        isHighlighted 
-                          ? "bg-info-muted ring-1 ring-inset ring-info/30" 
+                        isHighlighted
+                          ? "bg-info-muted ring-1 ring-inset ring-info/30"
                           : "hover:bg-accent/30"
                       )}
                     >
