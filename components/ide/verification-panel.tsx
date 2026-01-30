@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { useProject } from "@/lib/project-context";
+import { useFileContext } from "@/lib/contexts/file-context";
+import { useVerificationContext } from "@/lib/contexts/verification-context";
 import type { ProofObligation } from "@/lib/types";
 
 const statusConfig = {
@@ -57,25 +59,31 @@ const defaultProofObligations: ProofObligation[] = [
 ];
 
 export function VerificationPanel() {
-  const { state, runVerification } = useProject();
-  
+  const { state: projectState } = useProject();
+  const { state: fileState } = useFileContext();
+  const { state: verificationState, runVerification } = useVerificationContext();
+
+  // Derive dafny code from active file
+  const dafnyCode = fileState.activeFile?.fileType === 'dfy' ? fileState.activeFile.content : '';
+
   // Use proof obligations from context or show default
   const proofObligations = useMemo(() => {
-    if (state.proofObligations.length > 0) {
-      return state.proofObligations;
+    if (verificationState.proofObligations.length > 0) {
+      return verificationState.proofObligations;
     }
     // If we have gaps from spec generation, show them as pending
-    if (state.gaps.length > 0) {
-      return state.gaps.map((gap, i) => ({
+    if (projectState.gaps.length > 0) {
+      return projectState.gaps.map((gap, i) => ({
         id: gap.id || `gap-${i}`,
         name: gap.description,
         location: gap.location?.file || 'Spec.dfy',
         status: gap.severity === 'critical' ? 'failed' as const : 'warning' as const,
         details: gap.suggestion,
+        time: undefined, // Gaps don't have timing info
       }));
     }
     return defaultProofObligations;
-  }, [state.proofObligations, state.gaps]);
+  }, [verificationState.proofObligations, projectState.gaps]);
 
   const verifiedCount = proofObligations.filter(p => p.status === "verified").length;
   const failedCount = proofObligations.filter(p => p.status === "failed").length;
@@ -83,14 +91,14 @@ export function VerificationPanel() {
   const warningCount = proofObligations.filter(p => p.status === "warning" || p.status === "timeout").length;
 
   const handleRunVerification = async () => {
-    if (state.dafnyCode) {
-      await runVerification(state.dafnyCode);
+    if (dafnyCode) {
+      await runVerification(dafnyCode);
     }
   };
 
   return (
     <TooltipProvider>
-      <div className="flex h-full flex-col">
+      <div className="flex h-full min-w-0 flex-col">
         {/* Summary Header */}
         <div className="border-b border-border p-3">
           <div className="flex items-center justify-between">
@@ -99,17 +107,17 @@ export function VerificationPanel() {
               <span className="text-xs text-muted-foreground">{proofObligations.length} total</span>
               <Button
                 onClick={handleRunVerification}
-                disabled={state.isVerifying || !state.dafnyCode}
+                disabled={verificationState.isVerifying || !dafnyCode}
                 size="sm"
                 variant="ghost"
                 className="h-6 gap-1 px-2 text-xs"
               >
-                {state.isVerifying ? (
+                {verificationState.isVerifying ? (
                   <Loader2 className="h-3 w-3 animate-spin" />
                 ) : (
                   <Play className="h-3 w-3" />
                 )}
-                {state.isVerifying ? "Verifying..." : "Run"}
+                {verificationState.isVerifying ? "Verifying..." : "Run"}
               </Button>
             </div>
           </div>
@@ -131,17 +139,16 @@ export function VerificationPanel() {
               <span className="text-muted-foreground">{pendingCount}</span>
             </div>
           </div>
-          
+
           {/* Verification Results Summary */}
-          {state.verificationResults && (
-            <div className={`mt-2 rounded px-2 py-1 text-xs ${
-              state.verificationResults.verified 
-                ? "bg-primary/20 text-primary" 
+          {verificationState.verificationResults && (
+            <div className={`mt-2 rounded px-2 py-1 text-xs ${verificationState.verificationResults.verified
+                ? "bg-primary/20 text-primary"
                 : "bg-destructive/20 text-destructive"
-            }`}>
-              {state.verificationResults.verified 
-                ? `Verification passed in ${state.verificationResults.verification_time_ms}ms`
-                : `Verification failed: ${state.verificationResults.errors.length} errors`
+              }`}>
+              {verificationState.verificationResults.verified
+                ? `Verification passed in ${verificationState.verificationResults.verification_time_ms}ms`
+                : `Verification failed: ${verificationState.verificationResults.errors.length} errors`
               }
             </div>
           )}
@@ -159,8 +166,8 @@ export function VerificationPanel() {
                   <button className="group flex w-full items-start gap-2 border-b border-border/50 px-3 py-2.5 text-left transition-colors hover:bg-accent/50">
                     <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${config.className}`} />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-xs font-medium text-foreground">
+                      <div className="flex items-start gap-2">
+                        <span className="break-words text-xs font-medium text-foreground">
                           {proof.name}
                         </span>
                       </div>
@@ -177,15 +184,15 @@ export function VerificationPanel() {
                     <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="left" className="max-w-[300px]">
+                <TooltipContent side="left" className="max-w-[500px]">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <Icon className={`h-4 w-4 ${config.className}`} />
+                      <Icon className={`h-4 w-4 shrink-0 ${config.className}`} />
                       <span className="font-medium">{config.label}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground">{config.description}</p>
+                    <p className="text-xs text-muted-foreground break-words">{config.description}</p>
                     {proof.details && (
-                      <p className="border-t border-border pt-2 text-xs">{proof.details}</p>
+                      <p className="border-t border-border pt-2 text-xs break-words whitespace-pre-wrap">{proof.details}</p>
                     )}
                   </div>
                 </TooltipContent>
@@ -195,11 +202,11 @@ export function VerificationPanel() {
         </div>
 
         {/* Errors Section */}
-        {state.verificationResults?.errors && state.verificationResults.errors.length > 0 && (
+        {verificationState.verificationResults?.errors && verificationState.verificationResults.errors.length > 0 && (
           <div className="border-t border-border p-3">
             <h4 className="mb-2 text-xs font-medium text-destructive">Verification Errors</h4>
             <div className="space-y-2">
-              {state.verificationResults.errors.map((error, i) => (
+              {verificationState.verificationResults.errors.map((error, i) => (
                 <div key={i} className="rounded bg-destructive/10 p-2 text-xs">
                   <div className="font-mono text-destructive">
                     Line {error.line}:{error.column}

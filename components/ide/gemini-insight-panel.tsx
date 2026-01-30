@@ -4,6 +4,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Sparkles, Send, User, ChevronDown, Lightbulb, Code2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useProject } from "@/lib/project-context";
+import { useFileContext } from "@/lib/contexts/file-context";
+import { useVerificationContext } from "@/lib/contexts/verification-context";
 import type { ChatMessage } from "@/lib/types";
 
 interface Message extends ChatMessage {
@@ -12,30 +14,33 @@ interface Message extends ChatMessage {
 }
 
 export function GeminiInsightPanel() {
-  const { state, sendChatMessage } = useProject();
+  const { state: projectState, sendChatMessage } = useProject();
+  const { state: fileState } = useFileContext();
+  const { state: verificationState } = useVerificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isThinking, setIsThinking] = useState(false);
 
   // Build context from verification errors
   const verificationContext = useMemo(() => {
-    if (!state.verificationResults?.errors?.length) return null;
+    if (!verificationState.verificationResults?.errors?.length) return null;
     
-    const firstError = state.verificationResults.errors[0];
+    const firstError = verificationState.verificationResults.errors[0];
+    const dafnyCode = fileState.activeFile?.fileType === 'dfy' ? fileState.activeFile.content : '';
     return {
-      code: state.dafnyCode.split('\n').slice(
+      code: dafnyCode.split('\n').slice(
         Math.max(0, firstError.line - 5),
         firstError.line + 5
       ).join('\n'),
       location: `Line ${firstError.line}:${firstError.column}`,
       error: firstError.message,
     };
-  }, [state.verificationResults, state.dafnyCode]);
+  }, [verificationState.verificationResults, fileState.activeFile]);
 
   // Generate initial message based on verification results
   useEffect(() => {
-    if (state.verificationResults && messages.length === 0) {
-      const errors = state.verificationResults.errors;
+    if (verificationState.verificationResults && messages.length === 0) {
+      const errors = verificationState.verificationResults.errors;
       
       if (errors && errors.length > 0) {
         const initialMessage: Message = {
@@ -54,11 +59,11 @@ I can help you understand and fix these issues. What would you like to know?`,
           ],
         };
         setMessages([initialMessage]);
-      } else if (state.verificationResults.verified) {
+      } else if (verificationState.verificationResults.verified) {
         const successMessage: Message = {
           id: 'initial',
           role: 'assistant',
-          content: `Great news! All verification checks passed in **${state.verificationResults.verification_time_ms}ms**.
+          content: `Great news! All verification checks passed in **${verificationState.verificationResults.verification_time_ms}ms**.
 
 Your specification is formally verified. Would you like me to explain any of the proof obligations or help you extend the specification?`,
           suggestions: [
@@ -70,11 +75,11 @@ Your specification is formally verified. Would you like me to explain any of the
         setMessages([successMessage]);
       }
     }
-  }, [state.verificationResults, messages.length]);
+  }, [verificationState.verificationResults, messages.length]);
 
   // Show welcome message if no verification yet
   useEffect(() => {
-    if (!state.verificationResults && messages.length === 0 && state.hasProject) {
+    if (!verificationState.verificationResults && messages.length === 0 && projectState.hasProject) {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
@@ -94,7 +99,7 @@ Run verification on your Dafny code, and I'll automatically analyze any errors.`
         ],
       }]);
     }
-  }, [state.hasProject, state.verificationResults, messages.length]);
+  }, [projectState.hasProject, verificationState.verificationResults, messages.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,7 +152,7 @@ Run verification on your Dafny code, and I'll automatically analyze any errors.`
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-w-0 flex-col">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
         <div className="flex items-center gap-2">
@@ -155,7 +160,7 @@ Run verification on your Dafny code, and I'll automatically analyze any errors.`
           <span className="text-sm font-medium text-foreground">Verification Assistant</span>
         </div>
         <div className="flex items-center gap-2">
-          {!state.geminiConfigured && (
+          {!projectState.geminiConfigured && (
             <div className="flex items-center gap-1 text-xs text-warning">
               <AlertCircle className="h-3 w-3" />
               <span>Gemini not configured</span>

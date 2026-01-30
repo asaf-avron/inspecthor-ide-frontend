@@ -12,12 +12,27 @@ import type {
     ChatMessage,
     FileSaveRequest,
     FileSaveResponse,
+    FileUpdateRequest,
     FileResponse,
     FileListResponse,
     FileDeleteResponse,
+    ProjectCreateRequest,
+    ProjectUpdateRequest,
+    ProjectResponse,
+    ProjectListParams,
+    ProjectListResponse,
+    ProjectStructureResponse,
+    ProjectDeleteResponse,
     VerifyRequest,
     VerifyResponse,
     RigorLevel,
+    DeconstructRequest,
+    DeconstructResponse,
+    TraceabilityResponse,
+    FindGapsRequest,
+    FindGapsResponse,
+    RefineSpecRequest,
+    RefineSpecResponse,
 } from './types';
 
 // Re-export types for convenience
@@ -84,12 +99,40 @@ async function apiFetch<T>(
         const response = await fetch(url, {
             ...options,
             headers,
+            credentials: 'include', // Include cookies for authentication
         });
 
         if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
+            let errorData: any = {};
+            let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+            
+            try {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    errorData = await response.json();
+                    // Handle different error response formats
+                    if (errorData.detail) {
+                        errorMessage = typeof errorData.detail === 'string' 
+                            ? errorData.detail 
+                            : JSON.stringify(errorData.detail);
+                    } else if (errorData.message) {
+                        errorMessage = errorData.message;
+                    } else if (errorData.error) {
+                        errorMessage = typeof errorData.error === 'string'
+                            ? errorData.error
+                            : JSON.stringify(errorData.error);
+                    }
+                } else {
+                    const text = await response.text();
+                    errorMessage = text || errorMessage;
+                }
+            } catch (parseError) {
+                // If we can't parse the error, use the status text
+                console.error('Failed to parse error response:', parseError);
+            }
+            
             throw new APIError(
-                errorData.detail || `HTTP ${response.status}: ${response.statusText}`,
+                errorMessage,
                 response.status,
                 errorData
             );
@@ -102,8 +145,17 @@ async function apiFetch<T>(
         }
 
         // Network or other errors
+        let errorMessage = 'Unknown error occurred';
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+            errorMessage = `Cannot connect to backend at ${API_BASE_URL}. Please ensure the API server is running.`;
+        } else if (error instanceof Error) {
+            errorMessage = error.message;
+        } else if (typeof error === 'object' && error !== null) {
+            errorMessage = JSON.stringify(error);
+        }
+        
         throw new APIError(
-            error instanceof Error ? error.message : 'Unknown error occurred',
+            errorMessage,
             undefined,
             error
         );
@@ -122,14 +174,41 @@ export async function checkHealth(): Promise<HealthResponse> {
  */
 export async function generateSpec(
     englishSpec: string,
-    rigorLevel: RigorLevel = 'standard'
+    rigorLevel: RigorLevel = 'standard',
+    currentFilename?: string,
+    projectId?: string,
+    sourceFileId?: string
 ): Promise<GenerateSpecResponse> {
     return apiFetch<GenerateSpecResponse>('/api/generate/spec', {
         method: 'POST',
         body: JSON.stringify({ 
             english_spec: englishSpec,
             rigor_level: rigorLevel,
+            current_filename: currentFilename,
+            project_id: projectId,
+            source_file_id: sourceFileId,
         }),
+    });
+}
+
+/**
+ * Refine specification by applying gap suggestions
+ */
+export async function findGaps(
+    request: FindGapsRequest
+): Promise<FindGapsResponse> {
+    return apiFetch<FindGapsResponse>('/api/generate/find-gaps', {
+        method: 'POST',
+        body: JSON.stringify(request),
+    });
+}
+
+export async function refineSpec(
+    request: RefineSpecRequest
+): Promise<RefineSpecResponse> {
+    return apiFetch<RefineSpecResponse>('/api/generate/refine-spec', {
+        method: 'POST',
+        body: JSON.stringify(request),
     });
 }
 
@@ -186,10 +265,120 @@ export async function listFiles(
 }
 
 /**
+ * Update a file by ID (atomic update)
+ * Convenience wrapper with direct parameters
+ */
+export async function updateFile(
+    fileId: string,
+    content: string,
+    filename?: string
+): Promise<FileResponse> {
+    const request: FileUpdateRequest = { content };
+    if (filename) {
+        request.filename = filename;
+    }
+    return apiFetch<FileResponse>(`/api/files/${fileId}`, {
+        method: 'PUT',
+        body: JSON.stringify(request),
+    });
+}
+
+/**
+ * Update a file by ID (atomic update)
+ * Full request object version
+ */
+export async function updateFileWithRequest(
+    fileId: string,
+    request: FileUpdateRequest
+): Promise<FileResponse> {
+    return apiFetch<FileResponse>(`/api/files/${fileId}`, {
+        method: 'PUT',
+        body: JSON.stringify(request),
+    });
+}
+
+/**
  * Delete a file by ID
  */
 export async function deleteFile(fileId: string): Promise<FileDeleteResponse> {
     return apiFetch<FileDeleteResponse>(`/api/files/${fileId}`, {
+        method: 'DELETE',
+    });
+}
+
+// === Project Management APIs ===
+
+/**
+ * Create a new project with bootstrap README
+ */
+export async function createProject(
+    name: string,
+    description?: string
+): Promise<ProjectResponse> {
+    const payload: { name: string; description?: string } = { name };
+    if (description) {
+        payload.description = description;
+    }
+    return apiFetch<ProjectResponse>('/api/projects/', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+    });
+}
+
+/**
+ * List all projects with pagination and sorting
+ */
+export async function listProjects(
+    params?: ProjectListParams
+): Promise<ProjectListResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    if (params?.sort) queryParams.append('sort', params.sort);
+    if (params?.order) queryParams.append('order', params.order);
+    
+    const queryString = queryParams.toString();
+    const endpoint = queryString ? `/api/projects?${queryString}` : '/api/projects';
+    
+    return apiFetch<ProjectListResponse>(endpoint);
+}
+
+/**
+ * Get project structure (project + file tree) in one RTT
+ */
+export async function getProjectStructure(
+    projectId: string
+): Promise<ProjectStructureResponse> {
+    return apiFetch<ProjectStructureResponse>(`/api/projects/${projectId}/structure`);
+}
+
+/**
+ * Get single project details
+ */
+export async function getProject(projectId: string): Promise<ProjectResponse> {
+    return apiFetch<ProjectResponse>(`/api/projects/${projectId}`);
+}
+
+/**
+ * Update project (name and/or description)
+ */
+export async function updateProject(
+    projectId: string,
+    updates: ProjectUpdateRequest
+): Promise<ProjectResponse> {
+    return apiFetch<ProjectResponse>(`/api/projects/${projectId}`, {
+        method: 'PUT',
+        body: JSON.stringify(updates),
+    });
+}
+
+/**
+ * Delete project (cascade deletes all files)
+ */
+export async function deleteProject(
+    projectId: string
+): Promise<ProjectDeleteResponse> {
+    return apiFetch<ProjectDeleteResponse>(`/api/projects/${projectId}`, {
         method: 'DELETE',
     });
 }
@@ -206,6 +395,29 @@ export async function verifyDafny(
         method: 'POST',
         body: JSON.stringify(request),
     });
+}
+
+// === Deconstruction APIs ===
+
+/**
+ * Deconstruct a specification into verifiable units
+ */
+export async function deconstructSpec(
+    request: DeconstructRequest
+): Promise<DeconstructResponse> {
+    return apiFetch<DeconstructResponse>('/api/deconstruct', {
+        method: 'POST',
+        body: JSON.stringify(request),
+    });
+}
+
+/**
+ * Get traceability links for a specification file
+ */
+export async function getTraceability(
+    fileId: string
+): Promise<TraceabilityResponse> {
+    return apiFetch<TraceabilityResponse>(`/api/files/${fileId}/traceability`);
 }
 
 /**
@@ -250,15 +462,28 @@ export const apiClient = {
     checkHealth,
     // Generation
     generateSpec,
+    findGaps,
+    refineSpec,
     // Chat
     chatWithAssistant,
     // Files
     saveFile,
     getFile,
+    updateFile,
     listFiles,
     deleteFile,
+    // Projects
+    createProject,
+    listProjects,
+    getProjectStructure,
+    getProject,
+    updateProject,
+    deleteProject,
     // Verification
     verifyDafny,
+    // Deconstruction
+    deconstructSpec,
+    getTraceability,
     // Utilities
     withRetry,
 };
