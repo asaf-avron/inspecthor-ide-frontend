@@ -13,6 +13,7 @@ import { UserMenu } from "@/components/auth/user-menu";
 import { LoginModal } from "@/components/auth/login-modal";
 import { BlueprintInitModal } from "@/components/blueprint/init-modal";
 import { useAuth } from "@/lib/auth-context";
+import { useGitHub } from "@/lib/github-context";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -38,6 +39,7 @@ export function Header({
   onViewModeChange,
 }: HeaderProps) {
   const { isAuthenticated, login } = useAuth();
+  const { installations, fetchInstallations } = useGitHub();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showBlueprintInitModal, setShowBlueprintInitModal] = useState(false);
   const { resolvedTheme } = useTheme();
@@ -47,6 +49,16 @@ export function Header({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Fetch installations when authenticated
+  useEffect(() => {
+    if (isAuthenticated && installations.length === 0) {
+      fetchInstallations();
+    }
+  }, [isAuthenticated, installations.length, fetchInstallations]);
+
+  // Get the first installation ID (or 0 if none)
+  const installationId = installations[0]?.installation_id || 0;
 
   return (
     <>
@@ -58,6 +70,7 @@ export function Header({
       <BlueprintInitModal
         open={showBlueprintInitModal}
         onOpenChange={setShowBlueprintInitModal}
+        installationId={installationId}
         onSuccess={(response) => {
           console.log("Blueprint initialized:", response);
         }}

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Rocket, Github, Loader2, Check, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Rocket, Loader2, Check, ExternalLink, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -23,6 +23,17 @@ import {
 import { initializeBlueprint } from "@/lib/api-client";
 import type { BlueprintDomain, BlueprintInitResponse } from "@/lib/types";
 
+interface Repository {
+    github_repo_id: number;
+    owner: string;
+    name: string;
+    full_name: string;
+    default_branch: string;
+    html_url: string;
+    private?: boolean;
+    description?: string;
+}
+
 interface BlueprintInitModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -40,21 +51,73 @@ export function BlueprintInitModal({
 }: BlueprintInitModalProps) {
     const [state, setState] = useState<ModalState>("form");
     const [name, setName] = useState("");
-    const [repositoryUrl, setRepositoryUrl] = useState("");
+    const [selectedRepo, setSelectedRepo] = useState<string>("");
     const [domain, setDomain] = useState<BlueprintDomain>("custom");
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<BlueprintInitResponse | null>(null);
 
+    // Repository loading state
+    const [repositories, setRepositories] = useState<Repository[]>([]);
+    const [loadingRepos, setLoadingRepos] = useState(false);
+    const [reposError, setReposError] = useState<string | null>(null);
+
+    // Fetch repositories when modal opens and installation ID is available
+    useEffect(() => {
+        if (open && installationId && installationId > 0) {
+            fetchRepositories();
+        }
+    }, [open, installationId]);
+
+    const fetchRepositories = async () => {
+        if (!installationId || installationId <= 0) return;
+
+        setLoadingRepos(true);
+        setReposError(null);
+
+        try {
+            const response = await fetch(`/api/github/installations/${installationId}/repositories`, {
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch repositories: ${response.status}`);
+            }
+
+            const data = await response.json();
+            setRepositories(data.repositories || []);
+        } catch (err) {
+            console.error('Failed to fetch repositories:', err);
+            setReposError(err instanceof Error ? err.message : 'Failed to load repositories');
+        } finally {
+            setLoadingRepos(false);
+        }
+    };
+
+    // Auto-derive name from selected repo
+    const handleRepoChange = (repoFullName: string) => {
+        setSelectedRepo(repoFullName);
+
+        // Find the repo and derive a friendly name
+        const repo = repositories.find(r => r.full_name === repoFullName);
+        if (repo) {
+            // Convert repo-name to "Repo Name"
+            const derivedName = repo.name
+                .split(/[-_]/)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+            setName(derivedName);
+        }
+    };
+
     const handleSubmit = async () => {
-        if (!name.trim() || !repositoryUrl.trim()) {
-            setError("Please fill in all required fields");
+        if (!name.trim() || !selectedRepo) {
+            setError("Please select a repository and provide a name");
             return;
         }
 
-        // Validate GitHub URL format
-        const githubUrlPattern = /^https?:\/\/github\.com\/[^/]+\/[^/]+(?:\.git)?$/;
-        if (!githubUrlPattern.test(repositoryUrl.trim())) {
-            setError("Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo)");
+        const repo = repositories.find(r => r.full_name === selectedRepo);
+        if (!repo) {
+            setError("Please select a valid repository");
             return;
         }
 
@@ -64,7 +127,7 @@ export function BlueprintInitModal({
         try {
             const response = await initializeBlueprint({
                 name: name.trim(),
-                repository_url: repositoryUrl.trim(),
+                repository_url: repo.html_url,
                 installation_id: installationId || 0,
                 domain,
                 force: false,
@@ -87,7 +150,7 @@ export function BlueprintInitModal({
         // Reset state when closing
         setState("form");
         setName("");
-        setRepositoryUrl("");
+        setSelectedRepo("");
         setDomain("custom");
         setError(null);
         setResult(null);
@@ -112,6 +175,50 @@ export function BlueprintInitModal({
                     <>
                         <div className="grid gap-4 py-4">
                             <div className="grid gap-2">
+                                <Label htmlFor="repository">Select Repository</Label>
+                                {loadingRepos ? (
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                        Loading repositories...
+                                    </div>
+                                ) : reposError ? (
+                                    <div className="text-sm text-destructive py-2">
+                                        {reposError}
+                                        <Button variant="link" size="sm" onClick={fetchRepositories} className="ml-2">
+                                            Retry
+                                        </Button>
+                                    </div>
+                                ) : repositories.length === 0 ? (
+                                    <div className="text-sm text-muted-foreground py-2">
+                                        No repositories found. Make sure the InspecThor app has access to your repositories.
+                                    </div>
+                                ) : (
+                                    <Select value={selectedRepo} onValueChange={handleRepoChange}>
+                                        <SelectTrigger id="repository">
+                                            <SelectValue placeholder="Choose a repository..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {repositories.map((repo) => (
+                                                <SelectItem key={repo.full_name} value={repo.full_name}>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="font-medium">{repo.full_name}</span>
+                                                        {repo.private && (
+                                                            <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                                                                private
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                                <p className="text-xs text-muted-foreground">
+                                    The repository should be empty or contain only README/LICENSE.
+                                </p>
+                            </div>
+
+                            <div className="grid gap-2">
                                 <Label htmlFor="name">Blueprint Name</Label>
                                 <Input
                                     id="name"
@@ -119,22 +226,8 @@ export function BlueprintInitModal({
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                 />
-                            </div>
-
-                            <div className="grid gap-2">
-                                <Label htmlFor="repository">GitHub Repository URL</Label>
-                                <div className="relative">
-                                    <Github className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                                    <Input
-                                        id="repository"
-                                        placeholder="https://github.com/owner/repo"
-                                        className="pl-10"
-                                        value={repositoryUrl}
-                                        onChange={(e) => setRepositoryUrl(e.target.value)}
-                                    />
-                                </div>
                                 <p className="text-xs text-muted-foreground">
-                                    The repository should be empty or contain only README/LICENSE.
+                                    A friendly name for your blueprint. Auto-derived from repo name.
                                 </p>
                             </div>
 
@@ -164,7 +257,11 @@ export function BlueprintInitModal({
                             <Button variant="outline" onClick={handleClose}>
                                 Cancel
                             </Button>
-                            <Button onClick={handleSubmit} className="gap-2">
+                            <Button
+                                onClick={handleSubmit}
+                                className="gap-2"
+                                disabled={!selectedRepo || !name.trim() || loadingRepos}
+                            >
                                 <Rocket className="h-4 w-4" />
                                 Initialize
                             </Button>
