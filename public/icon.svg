@@ -1,13 +1,19 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Hammer - vertical bar -->
+  <rect x="14" y="18" width="4" height="10" fill="#0EA5E9" rx="0.5"/>
+  
+  <!-- Hammer - horizontal head -->
+  <rect x="8" y="14" width="16" height="6" fill="#0EA5E9" rx="1"/>
+  
   <!-- Eye shape -->
-  <ellipse cx="16" cy="16" rx="14" ry="9" fill="#1E293B"/>
+  <ellipse cx="16" cy="10" rx="12" ry="7" fill="#1E293B"/>
   
   <!-- Iris -->
-  <circle cx="16" cy="16" r="6" fill="#06B6D4"/>
+  <circle cx="16" cy="10" r="4.5" fill="#06B6D4"/>
   
   <!-- Pupil -->
-  <circle cx="16" cy="16" r="3.5" fill="#0E7490"/>
+  <circle cx="16" cy="10" r="2.5" fill="#0E7490"/>
   
   <!-- Highlight -->
-  <circle cx="17.5" cy="14.5" r="1.5" fill="#67E8F9" opacity="0.8"/>
+  <circle cx="17" cy="9" r="1" fill="#67E8F9" opacity="0.9"/>
 </svg>
