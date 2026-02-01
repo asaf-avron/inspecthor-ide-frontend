@@ -61,7 +61,7 @@ export function Header({
             alt="Guardian Gateway Logo"
             width={64}
             height={64}
-            className="h-18 w-18 object-contain"
+            className="h-12 w-12 object-contain"
             priority
           />
 
