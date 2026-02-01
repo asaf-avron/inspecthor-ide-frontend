@@ -228,7 +228,7 @@ interface ProjectContextType {
     // Actions
     checkHealth: () => Promise<void>;
     createProject: (name: string, description?: string) => Promise<void>;
-    loadProjectFromUrl: (projectId: string) => Promise<void>;
+    loadProjectFromUrl: (projectId: string, forceRefresh?: boolean) => Promise<void>;
     switchProject: (newProjectId: string) => Promise<void>;
     // Generation and refinement
     generateSpec: (englishSpec: string, sourceFileId?: string, currentFilename?: string) => Promise<void>;
@@ -328,8 +328,8 @@ export function ProjectProvider({
         }
     }, [addLog, router]);
 
-    const loadProjectFromUrl = useCallback(async (projectId: string) => {
-        if (state.projectId === projectId && state.currentProject) {
+    const loadProjectFromUrl = useCallback(async (projectId: string, forceRefresh: boolean = false) => {
+        if (!forceRefresh && state.projectId === projectId && state.currentProject) {
             return; // Already loaded
         }
 
