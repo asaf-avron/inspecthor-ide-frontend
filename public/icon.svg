@@ -1,19 +1,22 @@
 <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Hammer - vertical bar -->
-  <rect x="14" y="18" width="4" height="10" fill="#0EA5E9" rx="0.5"/>
+  <!-- Top horizontal bar (I shape) -->
+  <rect x="6" y="4" width="20" height="7" fill="#0EA5E9" rx="0.5"/>
   
-  <!-- Hammer - horizontal head -->
-  <rect x="8" y="14" width="16" height="6" fill="#0EA5E9" rx="1"/>
+  <!-- Eye shape (almond/ellipse) -->
+  <ellipse cx="16" cy="7.5" rx="8" ry="5" fill="#1E293B"/>
   
-  <!-- Eye shape -->
-  <ellipse cx="16" cy="10" rx="12" ry="7" fill="#1E293B"/>
+  <!-- Iris (cyan) -->
+  <circle cx="16" cy="7.5" r="3" fill="#06B6D4"/>
   
-  <!-- Iris -->
-  <circle cx="16" cy="10" r="4.5" fill="#06B6D4"/>
-  
-  <!-- Pupil -->
-  <circle cx="16" cy="10" r="2.5" fill="#0E7490"/>
+  <!-- Pupil (darker cyan) -->
+  <circle cx="16" cy="7.5" r="1.8" fill="#0E7490"/>
   
   <!-- Highlight -->
-  <circle cx="17" cy="9" r="1" fill="#67E8F9" opacity="0.9"/>
+  <circle cx="16.8" cy="6.8" r="0.8" fill="#67E8F9" opacity="0.9"/>
+  
+  <!-- Vertical stem (I shape) -->
+  <rect x="13" y="11" width="6" height="10" fill="#0EA5E9" rx="0.5"/>
+  
+  <!-- Bottom horizontal bar (I shape) -->
+  <rect x="10" y="21" width="12" height="7" fill="#0EA5E9" rx="0.5"/>
 </svg>
