@@ -49,6 +49,28 @@ export interface SpecStatistics {
     critical_gaps: number;
 }
 
+// === Blueprint Types ===
+export type BlueprintDomain = "banking" | "healthcare" | "authentication" | "custom";
+
+export interface BlueprintInitRequest {
+    name: string;
+    repository_url: string;
+    installation_id: number;
+    domain?: BlueprintDomain;
+    force?: boolean;
+}
+
+export interface BlueprintInitResponse {
+    blueprint_id: string;
+    name: string;
+    repository_url: string;
+    commit_sha: string;
+    commit_url: string;
+    files_created: string[];
+    default_branch: string;
+    next_steps: string[];
+}
+
 export interface GenerateSpecOptions {
     include_examples?: boolean;
     strictness_level?: "low" | "medium" | "high";
@@ -443,20 +465,20 @@ export interface TraceabilityResponse {
 export type SaveStatus = "clean" | "dirty" | "saving" | "error";
 
 export interface ActiveFileState {
-  id: string;
-  content: string;           // Current editor content
-  syncedContent: string;     // Last confirmed saved content
-  status: SaveStatus;
-  lastSavedAt: Date | null;
-  filename: string;
-  fileType: FileType;
-  projectId: string;
+    id: string;
+    content: string;           // Current editor content
+    syncedContent: string;     // Last confirmed saved content
+    status: SaveStatus;
+    lastSavedAt: Date | null;
+    filename: string;
+    fileType: FileType;
+    projectId: string;
 }
 
 export interface FileCache {
-  [fileId: string]: {
-    content: string;
-    timestamp: number;
-    fileType: string;
-  }
+    [fileId: string]: {
+        content: string;
+        timestamp: number;
+        fileType: string;
+    }
 }
