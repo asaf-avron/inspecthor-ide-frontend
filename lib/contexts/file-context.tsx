@@ -115,7 +115,7 @@ function fileReducer(state: FileState, action: FileAction): FileState {
                 created_at: f.updated_at,
                 updated_at: f.updated_at,
             }));
-            
+
             // Build project files tree from structure
             const projectFiles: ProjectFileItem[] = [
                 {
@@ -130,7 +130,7 @@ function fileReducer(state: FileState, action: FileAction): FileState {
                     })),
                 },
             ];
-            
+
             return {
                 ...state,
                 files: fileListItems,
@@ -195,7 +195,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
     // Use a ref to track the last synced structure to prevent infinite loops
     const lastSyncedStructureRef = useRef<ProjectStructureResponse | null>(null);
     React.useEffect(() => {
-        if (projectState.projectStructure && 
+        if (projectState.projectStructure &&
             projectState.projectStructure !== lastSyncedStructureRef.current) {
             lastSyncedStructureRef.current = projectState.projectStructure;
             dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: projectState.projectStructure });
@@ -207,12 +207,12 @@ export function FileProvider({ children }: { children: ReactNode }) {
         // Check cache first
         const cached = state.fileCache[fileId];
         const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-        
+
         if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
             // Use cached content
-            const file = state.files.find(f => f.file_id === fileId) || 
-                        projectState.projectStructure?.files.find(f => f.file_id === fileId);
-            
+            const file = state.files.find(f => f.file_id === fileId) ||
+                projectState.projectStructure?.files.find(f => f.file_id === fileId);
+
             if (file) {
                 dispatch({
                     type: 'SET_ACTIVE_FILE',
@@ -230,11 +230,11 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 return;
             }
         }
-        
+
         // Load from API
         try {
             const fileResponse = await apiClient.getFile(fileId);
-            
+
             // Update cache
             dispatch({
                 type: 'UPDATE_FILE_CACHE',
@@ -244,7 +244,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
                     fileType: fileResponse.file_type,
                 },
             });
-            
+
             // Set active file
             dispatch({
                 type: 'SET_ACTIVE_FILE',
@@ -272,10 +272,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
         if (!projectState.projectId) {
             throw new Error('No project selected');
         }
-        
+
         dispatch({ type: 'SET_SAVING', payload: true });
         dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
-        
+
         try {
             const response = await apiClient.saveFile({
                 filename,
@@ -285,10 +285,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
             });
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'clean' });
             dispatch({ type: 'MARK_CLEAN', payload: response.file_id });
-            
+
             // Reload project structure via ProjectContext (which will sync to FileContext)
             if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId);
+                await loadProjectFromUrl(projectState.projectId, true);
             }
         } catch (error) {
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'error' });
@@ -297,7 +297,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_SAVING', payload: false });
         }
     }, [projectState.projectId]);
-    
+
     const updateFile = useCallback(async (
         fileId: string,
         content: string,
@@ -305,15 +305,15 @@ export function FileProvider({ children }: { children: ReactNode }) {
     ) => {
         dispatch({ type: 'SET_SAVING', payload: true });
         dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
-        
+
         try {
             await apiClient.updateFile(fileId, content, filename);
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'clean' });
             dispatch({ type: 'MARK_CLEAN', payload: fileId });
-            
+
             // Reload project structure via ProjectContext (which will sync to FileContext)
             if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId);
+                await loadProjectFromUrl(projectState.projectId, true);
             }
         } catch (error) {
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'error' });
@@ -322,19 +322,19 @@ export function FileProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_SAVING', payload: false });
         }
     }, [projectState.projectId]);
-    
+
     // Force save current active file
     const forceSaveCurrentFile = useCallback(async () => {
         if (!state.activeFile) {
             return;
         }
-        
+
         const { id, content } = state.activeFile;
         dispatch({ type: 'SET_SAVE_STATUS', payload: 'saving' });
-        
+
         try {
             const response = await apiClient.updateFile(id, content);
-            
+
             dispatch({
                 type: 'SET_ACTIVE_FILE',
                 payload: {
@@ -344,7 +344,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
                     lastSavedAt: new Date(response.updated_at),
                 },
             });
-            
+
             // Update cache
             dispatch({
                 type: 'UPDATE_FILE_CACHE',
@@ -354,14 +354,14 @@ export function FileProvider({ children }: { children: ReactNode }) {
                     fileType: state.activeFile.fileType,
                 },
             });
-            
+
             dispatch({ type: 'MARK_CLEAN', payload: id });
         } catch (error) {
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'error' });
             throw error;
         }
     }, [state.activeFile]);
-    
+
     const forceSave = useCallback(async (fileId: string) => {
         // Get current content based on selected file
         let content = '';
@@ -370,7 +370,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         } else if (state.fileCache[fileId]) {
             content = state.fileCache[fileId].content;
         }
-        
+
         if (content) {
             await updateFile(fileId, content);
         }
@@ -381,7 +381,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         // If switching away from current file, check if it needs saving
         if (state.activeFile && state.activeFile.id !== fileId) {
             const currentFile = state.activeFile;
-            
+
             // If dirty or saving, force save before switching
             if (currentFile.status === 'dirty' || currentFile.status === 'saving') {
                 try {
@@ -393,10 +393,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 }
             }
         }
-        
+
         // Update selected file ID
         dispatch({ type: 'SET_SELECTED_FILE_ID', payload: fileId });
-        
+
         // Load new file if provided
         if (fileId) {
             await loadFile(fileId);
@@ -417,13 +417,13 @@ export function FileProvider({ children }: { children: ReactNode }) {
     const deleteFile = useCallback(async (fileId: string) => {
         try {
             await apiClient.deleteFile(fileId);
-            
+
             // Remove from cache and dirty set
             dispatch({ type: 'REMOVE_FILE', payload: fileId });
-            
+
             // Reload project structure via ProjectContext (which will sync to FileContext via useEffect)
             if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId);
+                await loadProjectFromUrl(projectState.projectId, true);
             }
         } catch (error) {
             throw error;
@@ -433,13 +433,13 @@ export function FileProvider({ children }: { children: ReactNode }) {
     // Rename file
     const renameFile = useCallback(async (fileId: string, newName: string) => {
         // Find the file in files array or use activeFile
-        const fileToRename = state.files.find(f => f.file_id === fileId) || 
-                            (state.activeFile && state.activeFile.id === fileId ? state.activeFile : null);
-        
+        const fileToRename = state.files.find(f => f.file_id === fileId) ||
+            (state.activeFile && state.activeFile.id === fileId ? state.activeFile : null);
+
         if (!fileToRename) {
             throw new Error('File not found');
         }
-        
+
         // Get current content
         let currentContent = '';
         if (state.activeFile && state.activeFile.id === fileId) {
@@ -453,16 +453,16 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 throw new Error('Failed to load file content for rename');
             }
         }
-        
+
         // Validate filename
         const invalidChars = /[\/\\:*?"<>|]/;
         if (invalidChars.test(newName)) {
             throw new Error('Filename contains invalid characters');
         }
-        
+
         try {
             const response = await apiClient.updateFile(fileId, currentContent, newName);
-            
+
             // Update active file if it's the renamed file
             if (state.activeFile && state.activeFile.id === fileId) {
                 dispatch({
@@ -473,10 +473,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
                     },
                 });
             }
-            
+
             // Reload project structure via ProjectContext (which will sync to FileContext via useEffect)
             if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId);
+                await loadProjectFromUrl(projectState.projectId, true);
             }
         } catch (error) {
             throw error;
@@ -489,7 +489,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         const ext = type === 'md' ? 'md' : 'dfy';
         const defaultFilename = `untitled-${timestamp}.${ext}`;
         const emptyContent = '';
-        
+
         try {
             const response = await apiClient.saveFile({
                 filename: defaultFilename,
@@ -497,10 +497,10 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 file_type: type,
                 project_id: projectId,
             });
-            
+
             // Reload project structure via ProjectContext (which will sync to FileContext via useEffect)
-            await loadProjectFromUrl(projectId);
-            
+            await loadProjectFromUrl(projectId, true);
+
             // Select and load the new file
             await selectFile(response.file_id);
         } catch (error) {

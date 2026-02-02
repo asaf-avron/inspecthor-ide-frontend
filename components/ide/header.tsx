@@ -1,6 +1,6 @@
 "use client";
 
-import { Play, ChevronDown, HelpCircle, Eye, Edit3, Github } from "lucide-react";
+import { Play, ChevronDown, HelpCircle, Eye, Edit3, Github, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserMenu } from "@/components/auth/user-menu";
 import { LoginModal } from "@/components/auth/login-modal";
+import { BlueprintInitModal } from "@/components/blueprint/init-modal";
 import { useAuth } from "@/lib/auth-context";
+import { useGitHub } from "@/lib/github-context";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -37,7 +39,9 @@ export function Header({
   onViewModeChange,
 }: HeaderProps) {
   const { isAuthenticated, login } = useAuth();
+  const { installations, fetchInstallations } = useGitHub();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showBlueprintInitModal, setShowBlueprintInitModal] = useState(false);
   const { resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -46,12 +50,30 @@ export function Header({
     setMounted(true);
   }, []);
 
+  // Fetch installations when authenticated
+  useEffect(() => {
+    if (isAuthenticated && installations.length === 0) {
+      fetchInstallations();
+    }
+  }, [isAuthenticated, installations.length, fetchInstallations]);
+
+  // Get the first installation ID (or 0 if none)
+  const installationId = installations[0]?.installation_id || 0;
+
   return (
     <>
       <LoginModal
         open={showLoginModal}
         onOpenChange={setShowLoginModal}
         trigger="general"
+      />
+      <BlueprintInitModal
+        open={showBlueprintInitModal}
+        onOpenChange={setShowBlueprintInitModal}
+        installationId={installationId}
+        onSuccess={(response) => {
+          console.log("Blueprint initialized:", response);
+        }}
       />
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border bg-background px-1">
         {/* Left: Logo */}
@@ -154,6 +176,20 @@ export function Header({
 
         {/* Right: Actions */}
         <div className="flex items-center gap-2">
+          {/* Initialize Blueprint Button - for creating new verified projects */}
+          {isAuthenticated && (
+            <Button
+              onClick={() => setShowBlueprintInitModal(true)}
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1.5 px-2.5 text-xs"
+              title="Initialize a new verified project in GitHub"
+            >
+              <Rocket className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Init Blueprint</span>
+            </Button>
+          )}
+
           {/* Run Verification Button - appears before help/user section */}
           {hasProject && showVerification && (
             <>

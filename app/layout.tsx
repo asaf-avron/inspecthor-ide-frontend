@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AuthProvider } from '@/lib/auth-context'
+import { GitHubProvider } from '@/lib/github-context'
 import { ProjectProvider } from '@/lib/project-context'
 import { FileProvider } from '@/lib/contexts/file-context'
 import { VerificationProvider } from '@/lib/contexts/verification-context'
@@ -34,13 +35,15 @@ export default function RootLayout({
           disableTransitionOnChange={false}
         >
           <AuthProvider>
-            <ProjectProvider>
-              <FileProvider>
-                <VerificationProvider>
-                  {children}
-                </VerificationProvider>
-              </FileProvider>
-            </ProjectProvider>
+            <GitHubProvider>
+              <ProjectProvider>
+                <FileProvider>
+                  <VerificationProvider>
+                    {children}
+                  </VerificationProvider>
+                </FileProvider>
+              </ProjectProvider>
+            </GitHubProvider>
           </AuthProvider>
         </ThemeProvider>
         <Toaster position="bottom-right" />
@@ -49,3 +52,4 @@ export default function RootLayout({
     </html>
   )
 }
+
