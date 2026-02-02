@@ -33,6 +33,8 @@ import type {
     FindGapsResponse,
     RefineSpecRequest,
     RefineSpecResponse,
+    BlueprintInitRequest,
+    BlueprintInitResponse,
 } from './types';
 
 // Re-export types for convenience
@@ -105,15 +107,15 @@ async function apiFetch<T>(
         if (!response.ok) {
             let errorData: any = {};
             let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-            
+
             try {
                 const contentType = response.headers.get('content-type');
                 if (contentType && contentType.includes('application/json')) {
                     errorData = await response.json();
                     // Handle different error response formats
                     if (errorData.detail) {
-                        errorMessage = typeof errorData.detail === 'string' 
-                            ? errorData.detail 
+                        errorMessage = typeof errorData.detail === 'string'
+                            ? errorData.detail
                             : JSON.stringify(errorData.detail);
                     } else if (errorData.message) {
                         errorMessage = errorData.message;
@@ -130,7 +132,7 @@ async function apiFetch<T>(
                 // If we can't parse the error, use the status text
                 console.error('Failed to parse error response:', parseError);
             }
-            
+
             throw new APIError(
                 errorMessage,
                 response.status,
@@ -153,7 +155,7 @@ async function apiFetch<T>(
         } else if (typeof error === 'object' && error !== null) {
             errorMessage = JSON.stringify(error);
         }
-        
+
         throw new APIError(
             errorMessage,
             undefined,
@@ -181,7 +183,7 @@ export async function generateSpec(
 ): Promise<GenerateSpecResponse> {
     return apiFetch<GenerateSpecResponse>('/api/generate/spec', {
         method: 'POST',
-        body: JSON.stringify({ 
+        body: JSON.stringify({
             english_spec: englishSpec,
             rigor_level: rigorLevel,
             current_filename: currentFilename,
@@ -257,10 +259,10 @@ export async function listFiles(
     const params = new URLSearchParams();
     if (projectId) params.append('project_id', projectId);
     if (fileType) params.append('file_type', fileType);
-    
+
     const queryString = params.toString();
     const endpoint = queryString ? `/api/files?${queryString}` : '/api/files';
-    
+
     return apiFetch<FileListResponse>(endpoint);
 }
 
@@ -336,10 +338,10 @@ export async function listProjects(
     if (params?.offset) queryParams.append('offset', params.offset.toString());
     if (params?.sort) queryParams.append('sort', params.sort);
     if (params?.order) queryParams.append('order', params.order);
-    
+
     const queryString = queryParams.toString();
     const endpoint = queryString ? `/api/projects?${queryString}` : '/api/projects';
-    
+
     return apiFetch<ProjectListResponse>(endpoint);
 }
 
@@ -456,6 +458,26 @@ export async function withRetry<T>(
     throw lastError!;
 }
 
+// === Blueprint APIs ===
+
+/**
+ * Initialize a GitHub repository with the Trusted Kernel Architecture.
+ * 
+ * This is the "Genesis Event" that pushes the initial structure:
+ * - blueprint.yaml (manifest)
+ * - kernel/Main.dfy (verified zone)
+ * - shell/main.py (I/O zone)
+ * - .github/workflows/verify.yml (CI enforcement)
+ */
+export async function initializeBlueprint(
+    request: BlueprintInitRequest
+): Promise<BlueprintInitResponse> {
+    return apiFetch<BlueprintInitResponse>('/api/v1/blueprints/initialize', {
+        method: 'POST',
+        body: JSON.stringify(request),
+    });
+}
+
 // Export configured API client
 export const apiClient = {
     // Health
@@ -484,8 +506,11 @@ export const apiClient = {
     // Deconstruction
     deconstructSpec,
     getTraceability,
+    // Blueprint
+    initializeBlueprint,
     // Utilities
     withRetry,
 };
 
 export default apiClient;
+
