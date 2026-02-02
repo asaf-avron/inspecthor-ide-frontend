@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Rocket, Loader2, Check, ExternalLink, ChevronDown } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Rocket, Loader2, Check, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -20,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { initializeBlueprint } from "@/lib/api-client";
 import type { BlueprintDomain, BlueprintInitResponse } from "@/lib/types";
 
@@ -49,10 +51,12 @@ export function BlueprintInitModal({
     installationId,
     onSuccess,
 }: BlueprintInitModalProps) {
+    const router = useRouter();
     const [state, setState] = useState<ModalState>("form");
     const [name, setName] = useState("");
     const [selectedRepo, setSelectedRepo] = useState<string>("");
     const [domain, setDomain] = useState<BlueprintDomain>("custom");
+    const [force, setForce] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [result, setResult] = useState<BlueprintInitResponse | null>(null);
 
@@ -61,12 +65,30 @@ export function BlueprintInitModal({
     const [loadingRepos, setLoadingRepos] = useState(false);
     const [reposError, setReposError] = useState<string | null>(null);
 
+    // Auto-redirect countdown
+    const [countdown, setCountdown] = useState(5);
+
     // Fetch repositories when modal opens and installation ID is available
     useEffect(() => {
         if (open && installationId && installationId > 0) {
             fetchRepositories();
         }
     }, [open, installationId]);
+
+    // Auto-redirect countdown when success
+    useEffect(() => {
+        if (state === "success" && countdown > 0) {
+            const timer = setTimeout(() => {
+                setCountdown(countdown - 1);
+            }, 1000);
+            return () => clearTimeout(timer);
+        } else if (state === "success" && countdown === 0 && result?.blueprint_id) {
+            // Navigate to IDE with the new project
+            const blueprintId = result.blueprint_id;
+            handleClose();
+            router.push(`/app/${blueprintId}`);
+        }
+    }, [state, countdown, selectedRepo, router, result]);
 
     const fetchRepositories = async () => {
         if (!installationId || installationId <= 0) return;
@@ -130,11 +152,12 @@ export function BlueprintInitModal({
                 repository_url: repo.html_url,
                 installation_id: installationId || 0,
                 domain,
-                force: false,
+                force,
             });
 
             setResult(response);
             setState("success");
+            setCountdown(5); // Reset countdown
             onSuccess?.(response);
         } catch (err) {
             setState("error");
@@ -154,7 +177,16 @@ export function BlueprintInitModal({
         setDomain("custom");
         setError(null);
         setResult(null);
+        setCountdown(5);
         onOpenChange(false);
+    };
+
+    const handleOpenProject = () => {
+        const blueprintId = result?.blueprint_id;
+        handleClose();
+        if (blueprintId) {
+            router.push(`/app/${blueprintId}`);
+        }
     };
 
     return (
@@ -246,6 +278,25 @@ export function BlueprintInitModal({
                                 </Select>
                             </div>
 
+                            <div className="flex items-center space-x-2 py-2">
+                                <Checkbox
+                                    id="force"
+                                    checked={force}
+                                    onCheckedChange={(checked) => setForce(checked as boolean)}
+                                />
+                                <div className="grid gap-1.5 leading-none">
+                                    <Label
+                                        htmlFor="force"
+                                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                                    >
+                                        Force initialization
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Overwrite existing files (use with caution)
+                                    </p>
+                                </div>
+                            </div>
+
                             {error && (
                                 <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">
                                     {error}
@@ -306,15 +357,10 @@ export function BlueprintInitModal({
                                     ))}
                                 </ul>
                             </div>
+                        </div>
 
-                            <div>
-                                <p className="text-sm font-medium text-muted-foreground">Next Steps</p>
-                                <ol className="mt-1 list-inside list-decimal space-y-1 text-sm">
-                                    {result.next_steps.slice(1).map((step, i) => (
-                                        <li key={i}>{step}</li>
-                                    ))}
-                                </ol>
-                            </div>
+                        <div className="text-center text-sm text-muted-foreground">
+                            Opening project in <span className="font-bold text-primary">{countdown}</span> seconds...
                         </div>
 
                         <DialogFooter className="mt-2">
@@ -326,7 +372,7 @@ export function BlueprintInitModal({
                                 <ExternalLink className="h-4 w-4" />
                                 View on GitHub
                             </Button>
-                            <Button onClick={handleClose}>Done</Button>
+                            <Button onClick={handleOpenProject}>Open Project Now</Button>
                         </DialogFooter>
                     </div>
                 )}
@@ -335,7 +381,7 @@ export function BlueprintInitModal({
                     <div className="flex flex-col gap-4 py-4">
                         <div className="rounded-md bg-destructive/10 p-4 text-center">
                             <p className="font-medium text-destructive">Initialization Failed</p>
-                            <p className="mt-1 text-sm text-muted-foreground">{error}</p>
+                            <p className="mt-1 text-sm text-muted-foreground break-words whitespace-pre-wrap">{error}</p>
                         </div>
 
                         <DialogFooter>
