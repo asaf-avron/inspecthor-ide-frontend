@@ -25,7 +25,7 @@ interface HeaderProps {
   onRunVerification: () => void;
   isVerifying: boolean;
   showVerification?: boolean;
-  hasProject?: boolean;
+  hasBlueprint?: boolean;
   viewMode?: ViewMode;
   onViewModeChange?: (mode: ViewMode) => void;
 }
@@ -34,7 +34,7 @@ export function Header({
   onRunVerification,
   isVerifying,
   showVerification = true,
-  hasProject = true,
+  hasBlueprint = true,
   viewMode = "edit",
   onViewModeChange,
 }: HeaderProps) {
@@ -88,7 +88,7 @@ export function Header({
           />
 
           {/* Navigation */}
-          {hasProject && (
+          {hasBlueprint && (
             <nav className="hidden items-center gap-1 md:flex">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -143,7 +143,7 @@ export function Header({
         </div>
 
         {/* Center: View Mode Toggle */}
-        {hasProject && onViewModeChange && (
+        {hasBlueprint && onViewModeChange && (
           <div className="flex items-center">
             <div className="flex items-center rounded-lg border border-border bg-secondary/30 p-0.5">
               <button
@@ -191,7 +191,7 @@ export function Header({
           )}
 
           {/* Run Verification Button - appears before help/user section */}
-          {hasProject && showVerification && (
+          {hasBlueprint && showVerification && (
             <>
               <Button
                 onClick={onRunVerification}

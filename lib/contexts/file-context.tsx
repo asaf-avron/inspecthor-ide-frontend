@@ -4,15 +4,15 @@ import React, { createContext, useContext, useReducer, useCallback, ReactNode, u
 import { apiClient } from '../api-client';
 import type {
     FileListItem,
-    ProjectFileItem,
-    ProjectFileType,
+    BlueprintFileItem,
+    BlueprintFileType,
     ActiveFileState,
     FileCache,
     FileType,
     FileResponse,
-    ProjectStructureResponse,
+    BlueprintStructureResponse,
 } from '../types';
-import { useProject } from '../project-context';
+import { useBlueprint } from '../blueprint-context';
 
 // === File State Types ===
 export type SaveStatus = "clean" | "dirty" | "saving" | "error";
@@ -23,7 +23,7 @@ export interface FileState {
     dirtyFiles: Set<string>;
     fileCache: FileCache;
     files: FileListItem[];
-    projectFiles: ProjectFileItem[];
+    blueprintFiles: BlueprintFileItem[];
     selectedFileId: string | null;
     isSaving: boolean;
 }
@@ -37,8 +37,8 @@ type FileAction =
     | { type: 'SET_SAVE_STATUS'; payload: SaveStatus }
     | { type: 'UPDATE_FILE_CACHE'; payload: { fileId: string; content: string; fileType: string } }
     | { type: 'SET_FILES'; payload: FileListItem[] }
-    | { type: 'SET_PROJECT_FILES'; payload: ProjectFileItem[] }
-    | { type: 'SET_PROJECT_STRUCTURE'; payload: ProjectStructureResponse | null }
+    | { type: 'SET_BLUEPRINT_FILES'; payload: BlueprintFileItem[] }
+    | { type: 'SET_BLUEPRINT_STRUCTURE'; payload: BlueprintStructureResponse | null }
     | { type: 'SET_SAVING'; payload: boolean }
     | { type: 'MARK_DIRTY'; payload: string }
     | { type: 'MARK_CLEAN'; payload: string }
@@ -51,7 +51,7 @@ const initialState: FileState = {
     dirtyFiles: new Set(),
     fileCache: {},
     files: [],
-    projectFiles: [],
+    blueprintFiles: [],
     selectedFileId: null,
     isSaving: false,
 };
@@ -103,9 +103,9 @@ function fileReducer(state: FileState, action: FileAction): FileState {
             };
         case 'SET_FILES':
             return { ...state, files: action.payload };
-        case 'SET_PROJECT_FILES':
-            return { ...state, projectFiles: action.payload };
-        case 'SET_PROJECT_STRUCTURE':
+        case 'SET_BLUEPRINT_FILES':
+            return { ...state, blueprintFiles: action.payload };
+        case 'SET_BLUEPRINT_STRUCTURE':
             // Convert FileMetadata[] to FileListItem[] for compatibility
             const fileListItems: FileListItem[] = (action.payload?.files || []).map(f => ({
                 file_id: f.file_id,
@@ -116,16 +116,16 @@ function fileReducer(state: FileState, action: FileAction): FileState {
                 updated_at: f.updated_at,
             }));
 
-            // Build project files tree from structure
-            const projectFiles: ProjectFileItem[] = [
+            // Build blueprint files tree from structure
+            const blueprintFiles: BlueprintFileItem[] = [
                 {
                     id: 'root-spec',
-                    name: action.payload?.project.name || 'Project',
+                    name: action.payload?.blueprint.name || 'Blueprint',
                     type: 'folder',
                     children: (action.payload?.files || []).map(f => ({
                         id: f.file_id,
                         name: f.filename,
-                        type: (f.file_type === 'md' ? 'md' : f.file_type === 'dfy' ? 'dfy' : 'unit') as ProjectFileType,
+                        type: (f.file_type === 'md' ? 'md' : f.file_type === 'dfy' ? 'dfy' : 'unit') as BlueprintFileType,
                         file_id: f.file_id,
                     })),
                 },
@@ -134,7 +134,7 @@ function fileReducer(state: FileState, action: FileAction): FileState {
             return {
                 ...state,
                 files: fileListItems,
-                projectFiles,
+                blueprintFiles,
             };
         case 'SET_SAVING':
             return { ...state, isSaving: action.payload };
@@ -176,7 +176,7 @@ interface FileContextType {
     updateFile: (fileId: string, content: string, filename?: string) => Promise<void>;
     deleteFile: (fileId: string) => Promise<void>;
     renameFile: (fileId: string, newName: string) => Promise<void>;
-    createNewFile: (type: FileType, projectId: string) => Promise<void>;
+    createNewFile: (type: FileType, blueprintId: string) => Promise<void>;
     selectFile: (fileId: string | null) => Promise<void>;
     updateFileContent: (content: string) => void;
     forceSaveCurrentFile: () => Promise<void>;
@@ -189,18 +189,18 @@ const FileContext = createContext<FileContextType | null>(null);
 // === Provider ===
 export function FileProvider({ children }: { children: ReactNode }) {
     const [state, dispatch] = useReducer(fileReducer, initialState);
-    const { state: projectState, loadProjectFromUrl } = useProject();
+    const { state: blueprintState, loadBlueprintFromUrl } = useBlueprint();
 
-    // Sync project structure changes from ProjectContext
+    // Sync blueprint structure changes from BlueprintContext
     // Use a ref to track the last synced structure to prevent infinite loops
-    const lastSyncedStructureRef = useRef<ProjectStructureResponse | null>(null);
+    const lastSyncedStructureRef = useRef<BlueprintStructureResponse | null>(null);
     React.useEffect(() => {
-        if (projectState.projectStructure &&
-            projectState.projectStructure !== lastSyncedStructureRef.current) {
-            lastSyncedStructureRef.current = projectState.projectStructure;
-            dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: projectState.projectStructure });
+        if (blueprintState.blueprintStructure &&
+            blueprintState.blueprintStructure !== lastSyncedStructureRef.current) {
+            lastSyncedStructureRef.current = blueprintState.blueprintStructure;
+            dispatch({ type: 'SET_BLUEPRINT_STRUCTURE', payload: blueprintState.blueprintStructure });
         }
-    }, [projectState.projectStructure]);
+    }, [blueprintState.blueprintStructure]);
 
     // Load file with caching (5 minute TTL)
     const loadFile = useCallback(async (fileId: string) => {
@@ -211,7 +211,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
             // Use cached content
             const file = state.files.find(f => f.file_id === fileId) ||
-                projectState.projectStructure?.files.find(f => f.file_id === fileId);
+                blueprintState.blueprintStructure?.files.find(f => f.file_id === fileId);
 
             if (file) {
                 dispatch({
@@ -224,7 +224,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
                         lastSavedAt: new Date(file.updated_at),
                         filename: file.filename,
                         fileType: file.file_type as FileType,
-                        projectId: projectState.projectId || '',
+                        blueprintId: blueprintState.blueprintId || '',
                     },
                 });
                 return;
@@ -256,21 +256,21 @@ export function FileProvider({ children }: { children: ReactNode }) {
                     lastSavedAt: new Date(fileResponse.updated_at),
                     filename: fileResponse.filename,
                     fileType: fileResponse.file_type as FileType,
-                    projectId: fileResponse.project_id,
+                    blueprintId: fileResponse.blueprint_id,
                 },
             });
         } catch (error) {
             throw error;
         }
-    }, [state.fileCache, state.files, projectState.projectStructure, projectState.projectId]);
+    }, [state.fileCache, state.files, blueprintState.blueprintStructure, blueprintState.blueprintId]);
 
     const saveFile = useCallback(async (
         filename: string,
         content: string,
         fileType: 'md' | 'dfy' | 'unit'
     ) => {
-        if (!projectState.projectId) {
-            throw new Error('No project selected');
+        if (!blueprintState.blueprintId) {
+            throw new Error('No blueprint selected');
         }
 
         dispatch({ type: 'SET_SAVING', payload: true });
@@ -281,14 +281,14 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 filename,
                 content,
                 file_type: fileType,
-                project_id: projectState.projectId,
+                blueprint_id: blueprintState.blueprintId,
             });
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'clean' });
             dispatch({ type: 'MARK_CLEAN', payload: response.file_id });
 
-            // Reload project structure via ProjectContext (which will sync to FileContext)
-            if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId, true);
+            // Reload blueprint structure via BlueprintContext (which will sync to FileContext)
+            if (blueprintState.blueprintId) {
+                await loadBlueprintFromUrl(blueprintState.blueprintId, true);
             }
         } catch (error) {
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'error' });
@@ -296,7 +296,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_SAVING', payload: false });
         }
-    }, [projectState.projectId]);
+    }, [blueprintState.blueprintId]);
 
     const updateFile = useCallback(async (
         fileId: string,
@@ -311,9 +311,9 @@ export function FileProvider({ children }: { children: ReactNode }) {
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'clean' });
             dispatch({ type: 'MARK_CLEAN', payload: fileId });
 
-            // Reload project structure via ProjectContext (which will sync to FileContext)
-            if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId, true);
+            // Reload blueprint structure via BlueprintContext (which will sync to FileContext)
+            if (blueprintState.blueprintId) {
+                await loadBlueprintFromUrl(blueprintState.blueprintId, true);
             }
         } catch (error) {
             dispatch({ type: 'SET_SAVE_STATUS', payload: 'error' });
@@ -321,7 +321,7 @@ export function FileProvider({ children }: { children: ReactNode }) {
         } finally {
             dispatch({ type: 'SET_SAVING', payload: false });
         }
-    }, [projectState.projectId]);
+    }, [blueprintState.blueprintId]);
 
     // Force save current active file
     const forceSaveCurrentFile = useCallback(async () => {
@@ -421,14 +421,14 @@ export function FileProvider({ children }: { children: ReactNode }) {
             // Remove from cache and dirty set
             dispatch({ type: 'REMOVE_FILE', payload: fileId });
 
-            // Reload project structure via ProjectContext (which will sync to FileContext via useEffect)
-            if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId, true);
+            // Reload blueprint structure via BlueprintContext (which will sync to FileContext via useEffect)
+            if (blueprintState.blueprintId) {
+                await loadBlueprintFromUrl(blueprintState.blueprintId, true);
             }
         } catch (error) {
             throw error;
         }
-    }, [projectState.projectId, loadProjectFromUrl]);
+    }, [blueprintState.blueprintId, loadBlueprintFromUrl]);
 
     // Rename file
     const renameFile = useCallback(async (fileId: string, newName: string) => {
@@ -474,17 +474,17 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 });
             }
 
-            // Reload project structure via ProjectContext (which will sync to FileContext via useEffect)
-            if (projectState.projectId) {
-                await loadProjectFromUrl(projectState.projectId, true);
+            // Reload blueprint structure via BlueprintContext (which will sync to FileContext via useEffect)
+            if (blueprintState.blueprintId) {
+                await loadBlueprintFromUrl(blueprintState.blueprintId, true);
             }
         } catch (error) {
             throw error;
         }
-    }, [state.activeFile, state.files, projectState.projectId, loadProjectFromUrl]);
+    }, [state.activeFile, state.files, blueprintState.blueprintId, loadBlueprintFromUrl]);
 
     // Create new file
-    const createNewFile = useCallback(async (type: FileType, projectId: string) => {
+    const createNewFile = useCallback(async (type: FileType, blueprintId: string) => {
         const timestamp = Date.now();
         const ext = type === 'md' ? 'md' : 'dfy';
         const defaultFilename = `untitled-${timestamp}.${ext}`;
@@ -495,18 +495,18 @@ export function FileProvider({ children }: { children: ReactNode }) {
                 filename: defaultFilename,
                 content: emptyContent,
                 file_type: type,
-                project_id: projectId,
+                blueprint_id: blueprintId,
             });
 
-            // Reload project structure via ProjectContext (which will sync to FileContext via useEffect)
-            await loadProjectFromUrl(projectId, true);
+            // Reload blueprint structure via BlueprintContext (which will sync to FileContext via useEffect)
+            await loadBlueprintFromUrl(blueprintId, true);
 
             // Select and load the new file
             await selectFile(response.file_id);
         } catch (error) {
             throw error;
         }
-    }, [selectFile, loadProjectFromUrl]);
+    }, [selectFile, loadBlueprintFromUrl]);
 
     const contextValue: FileContextType = {
         state,

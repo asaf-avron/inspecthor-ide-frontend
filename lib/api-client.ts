@@ -16,13 +16,13 @@ import type {
     FileResponse,
     FileListResponse,
     FileDeleteResponse,
-    ProjectCreateRequest,
-    ProjectUpdateRequest,
-    ProjectResponse,
-    ProjectListParams,
-    ProjectListResponse,
-    ProjectStructureResponse,
-    ProjectDeleteResponse,
+    BlueprintCreateRequest,
+    BlueprintUpdateRequest,
+    BlueprintResponse,
+    BlueprintListParams,
+    BlueprintListResponse,
+    BlueprintStructureResponse,
+    BlueprintDeleteResponse,
     VerifyRequest,
     VerifyResponse,
     RigorLevel,
@@ -87,14 +87,14 @@ async function apiFetch<T>(
     const url = `${API_BASE_URL}${endpoint}`;
 
     // Add API key to headers
-    const headers: HeadersInit = {
-        'Content-Type': 'application/json',
-        ...options.headers,
-    };
+    const headers = new Headers(options.headers);
+    if (!headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+    }
 
     // Add API key if available (not required for health check)
     if (API_KEY && !endpoint.includes('/health')) {
-        headers['X-API-Key'] = API_KEY;
+        headers.set('X-API-Key', API_KEY);
     }
 
     try {
@@ -178,7 +178,7 @@ export async function generateSpec(
     englishSpec: string,
     rigorLevel: RigorLevel = 'standard',
     currentFilename?: string,
-    projectId?: string,
+    blueprintId?: string,
     sourceFileId?: string
 ): Promise<GenerateSpecResponse> {
     return apiFetch<GenerateSpecResponse>('/api/generate/spec', {
@@ -187,7 +187,7 @@ export async function generateSpec(
             english_spec: englishSpec,
             rigor_level: rigorLevel,
             current_filename: currentFilename,
-            project_id: projectId,
+            blueprint_id: blueprintId,
             source_file_id: sourceFileId,
         }),
     });
@@ -253,11 +253,11 @@ export async function getFile(fileId: string): Promise<FileResponse> {
  * List all files, optionally filtered by project or type
  */
 export async function listFiles(
-    projectId?: string,
+    blueprintId?: string,
     fileType?: string
 ): Promise<FileListResponse> {
     const params = new URLSearchParams();
-    if (projectId) params.append('project_id', projectId);
+    if (blueprintId) params.append('blueprint_id', blueprintId);
     if (fileType) params.append('file_type', fileType);
 
     const queryString = params.toString();
@@ -308,31 +308,31 @@ export async function deleteFile(fileId: string): Promise<FileDeleteResponse> {
     });
 }
 
-// === Project Management APIs ===
+// === Blueprint Management APIs ===
 
 /**
- * Create a new project with bootstrap README
+ * Create a new blueprint
  */
-export async function createProject(
+export async function createBlueprint(
     name: string,
     description?: string
-): Promise<ProjectResponse> {
+): Promise<BlueprintResponse> {
     const payload: { name: string; description?: string } = { name };
     if (description) {
         payload.description = description;
     }
-    return apiFetch<ProjectResponse>('/api/projects/', {
+    return apiFetch<BlueprintResponse>('/api/blueprints', { // Endpoint without slash usually
         method: 'POST',
         body: JSON.stringify(payload),
     });
 }
 
 /**
- * List all projects with pagination and sorting
+ * List all blueprints with pagination and sorting
  */
-export async function listProjects(
-    params?: ProjectListParams
-): Promise<ProjectListResponse> {
+export async function listBlueprints(
+    params?: BlueprintListParams
+): Promise<BlueprintListResponse> {
     const queryParams = new URLSearchParams();
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.offset) queryParams.append('offset', params.offset.toString());
@@ -340,47 +340,47 @@ export async function listProjects(
     if (params?.order) queryParams.append('order', params.order);
 
     const queryString = queryParams.toString();
-    const endpoint = queryString ? `/api/projects?${queryString}` : '/api/projects';
+    const endpoint = queryString ? `/api/blueprints?${queryString}` : '/api/blueprints';
 
-    return apiFetch<ProjectListResponse>(endpoint);
+    return apiFetch<BlueprintListResponse>(endpoint);
 }
 
 /**
- * Get project structure (project + file tree) in one RTT
+ * Get blueprint structure (blueprint + file tree) in one RTT
  */
-export async function getProjectStructure(
-    projectId: string
-): Promise<ProjectStructureResponse> {
-    return apiFetch<ProjectStructureResponse>(`/api/projects/${projectId}/structure`);
+export async function getBlueprintStructure(
+    blueprintId: string
+): Promise<BlueprintStructureResponse> {
+    return apiFetch<BlueprintStructureResponse>(`/api/blueprints/${blueprintId}/structure`);
 }
 
 /**
- * Get single project details
+ * Get single blueprint details
  */
-export async function getProject(projectId: string): Promise<ProjectResponse> {
-    return apiFetch<ProjectResponse>(`/api/projects/${projectId}`);
+export async function getBlueprint(blueprintId: string): Promise<BlueprintResponse> {
+    return apiFetch<BlueprintResponse>(`/api/blueprints/${blueprintId}`);
 }
 
 /**
- * Update project (name and/or description)
+ * Update blueprint (name and/or description)
  */
-export async function updateProject(
-    projectId: string,
-    updates: ProjectUpdateRequest
-): Promise<ProjectResponse> {
-    return apiFetch<ProjectResponse>(`/api/projects/${projectId}`, {
+export async function updateBlueprint(
+    blueprintId: string,
+    updates: BlueprintUpdateRequest
+): Promise<BlueprintResponse> {
+    return apiFetch<BlueprintResponse>(`/api/blueprints/${blueprintId}`, {
         method: 'PUT',
         body: JSON.stringify(updates),
     });
 }
 
 /**
- * Delete project (cascade deletes all files)
+ * Delete blueprint (cascade deletes all files)
  */
-export async function deleteProject(
-    projectId: string
-): Promise<ProjectDeleteResponse> {
-    return apiFetch<ProjectDeleteResponse>(`/api/projects/${projectId}`, {
+export async function deleteBlueprint(
+    blueprintId: string
+): Promise<BlueprintDeleteResponse> {
+    return apiFetch<BlueprintDeleteResponse>(`/api/blueprints/${blueprintId}`, {
         method: 'DELETE',
     });
 }
@@ -472,7 +472,7 @@ export async function withRetry<T>(
 export async function initializeBlueprint(
     request: BlueprintInitRequest
 ): Promise<BlueprintInitResponse> {
-    return apiFetch<BlueprintInitResponse>('/api/v1/blueprints/initialize', {
+    return apiFetch<BlueprintInitResponse>('/api/blueprints/initialize', {
         method: 'POST',
         body: JSON.stringify(request),
     });
@@ -494,19 +494,19 @@ export const apiClient = {
     updateFile,
     listFiles,
     deleteFile,
-    // Projects
-    createProject,
-    listProjects,
-    getProjectStructure,
-    getProject,
-    updateProject,
-    deleteProject,
+    // Blueprints
+    createBlueprint,
+    listBlueprints,
+    getBlueprintStructure,
+    getBlueprint,
+    updateBlueprint,
+    deleteBlueprint,
     // Verification
     verifyDafny,
     // Deconstruction
     deconstructSpec,
     getTraceability,
-    // Blueprint
+    // Blueprint Init
     initializeBlueprint,
     // Utilities
     withRetry,

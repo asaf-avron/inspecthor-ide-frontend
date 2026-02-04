@@ -48,29 +48,29 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { apiClient } from "@/lib/api-client";
 import { toast } from "sonner";
-import type { ProjectFileItem, ProjectVerificationStatus, ProjectFileType, ProjectResponse, FileType } from "@/lib/types";
-import { CreateProjectModal } from "@/components/project/create-project-modal";
+import type { BlueprintFileItem, BlueprintVerificationStatus, BlueprintFileType, BlueprintResponse, FileType as CoreFileType } from "@/lib/types";
+import { CreateBlueprintModal } from "@/components/blueprint/create-blueprint-modal";
 
-export type FileType = ProjectFileType;
-export type VerificationStatus = ProjectVerificationStatus;
-export type FileItem = ProjectFileItem;
+export type FileType = BlueprintFileType;
+export type VerificationStatus = BlueprintVerificationStatus;
+export type FileItem = BlueprintFileItem;
 
-interface ProjectExplorerProps {
+interface BlueprintExplorerProps {
   selectedFile: string;
   onFileSelect: (fileId: string) => void;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
-  hasProject: boolean;
+  hasBlueprint: boolean;
   width?: number; // Width in pixels when expanded
   isResizing?: boolean; // Whether explorer is being resized
 }
 
-// Empty default - projects start with no files
-const defaultProjectFiles: FileItem[] = [];
+// Empty default - blueprints start with no files
+const defaultBlueprintFiles: FileItem[] = [];
 
 function VerificationIcon({ status }: { status?: VerificationStatus }) {
   switch (status) {
@@ -216,7 +216,7 @@ function FileTreeItem({
               <FileIcon type={item.type} isActive={isActive} />
             </>
           )}
-          
+
           {isRenaming ? (
             <Input
               ref={renameInputRef}
@@ -233,10 +233,10 @@ function FileTreeItem({
           ) : (
             <span className="flex-1 truncate">{item.name}</span>
           )}
-          
+
           {/* Verification Status */}
           {!isRenaming && <VerificationIcon status={item.verificationStatus} />}
-          
+
           {/* Linked Dfy indicator for units */}
           {!isRenaming && isUnit && item.linkedDfy && (
             <span className="text-[10px] text-muted-foreground/60">
@@ -261,7 +261,7 @@ function FileTreeItem({
                   Rename
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={() => setShowDeleteDialog(true)}
                   className="text-destructive"
                 >
@@ -311,45 +311,45 @@ function FileTreeItem({
   );
 }
 
-export function ProjectExplorer({
+export function BlueprintExplorer({
   selectedFile,
   onFileSelect,
   isCollapsed,
   onToggleCollapse,
-  hasProject,
+  hasBlueprint,
   width,
   isResizing,
-}: ProjectExplorerProps & { isResizing?: boolean }) {
+}: BlueprintExplorerProps & { isResizing?: boolean }) {
   const router = useRouter();
-  const { state: projectState, switchProject, createProject } = useProject();
+  const { state: blueprintState, switchBlueprint, createBlueprint } = useBlueprint();
   const { state: fileState, deleteFile, renameFile, createNewFile, selectFile } = useFileContext();
   const [showNewFileDialog, setShowNewFileDialog] = useState(false);
-  const [showCreateProjectModal, setShowCreateProjectModal] = useState(false);
-  const [newFileType, setNewFileType] = useState<FileType>('md');
-  const [projects, setProjects] = useState<ProjectResponse[]>([]);
-  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [showCreateBlueprintModal, setShowCreateBlueprintModal] = useState(false);
+  const [newFileType, setNewFileType] = useState<CoreFileType>('md');
+  const [blueprints, setBlueprints] = useState<BlueprintResponse[]>([]);
+  const [isLoadingBlueprints, setIsLoadingBlueprints] = useState(false);
 
-  // Load projects for switcher (always load, even when no project)
+  // Load blueprints for switcher (always load, even when no blueprint)
   // Also reload when authentication state changes (e.g., after login)
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const lastAuthStateRef = useRef<boolean | null>(null);
   const isLoadingRef = useRef(false);
 
-  const loadProjects = useCallback(async () => {
+  const loadBlueprints = useCallback(async () => {
     // Prevent concurrent calls
     if (isLoadingRef.current) {
       return;
     }
-    
+
     try {
       isLoadingRef.current = true;
-      setIsLoadingProjects(true);
-      const response = await apiClient.listProjects({ limit: 50, sort: 'updated_at', order: 'desc' });
-      setProjects(response.projects);
+      setIsLoadingBlueprints(true);
+      const response = await apiClient.listBlueprints({ limit: 50, sort: 'updated_at', order: 'desc' });
+      setBlueprints(response.blueprints);
     } catch (error) {
-      console.error('Failed to load projects:', error);
+      console.error('Failed to load blueprints:', error);
     } finally {
-      setIsLoadingProjects(false);
+      setIsLoadingBlueprints(false);
       isLoadingRef.current = false;
     }
   }, []);
@@ -359,21 +359,21 @@ export function ProjectExplorer({
     if (!authLoading) {
       const authChanged = lastAuthStateRef.current !== isAuthenticated;
       lastAuthStateRef.current = isAuthenticated;
-      
+
       if (authChanged || lastAuthStateRef.current === null) {
-        loadProjects();
+        loadBlueprints();
       }
     }
-  }, [isAuthenticated, authLoading, loadProjects]);
+  }, [isAuthenticated, authLoading, loadBlueprints]);
 
-  // Use project files from context or default
-  const projectFiles = useMemo(() => {
-    if (fileState.projectFiles.length > 0) {
+  // Use blueprint files from context or default
+  const blueprintFiles = useMemo(() => {
+    if (fileState.blueprintFiles.length > 0) {
       // Note: Verification status updates handled separately
-      return fileState.projectFiles;
+      return fileState.blueprintFiles;
     }
-    return defaultProjectFiles;
-  }, [fileState.projectFiles]);
+    return defaultBlueprintFiles;
+  }, [fileState.blueprintFiles]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -394,17 +394,17 @@ export function ProjectExplorer({
       }
     };
 
-    countItems(projectFiles);
+    countItems(blueprintFiles);
     return { units, verified, failed, pending };
-  }, [projectFiles]);
+  }, [blueprintFiles]);
 
-  const handleCreateProject = async (name: string, description?: string) => {
-    await createProject(name, description);
-    await loadProjects();
+  const handleCreateBlueprint = async (name: string, description?: string) => {
+    await createBlueprint(name, description);
+    await loadBlueprints();
   };
 
-  // No Project State
-  if (!hasProject) {
+  // No Blueprint State
+  if (!hasBlueprint) {
     if (isCollapsed) {
       return (
         <TooltipProvider delayDuration={0}>
@@ -431,12 +431,12 @@ export function ProjectExplorer({
 
     return (
       <>
-        <CreateProjectModal
-          open={showCreateProjectModal}
-          onOpenChange={setShowCreateProjectModal}
-          onCreateProject={handleCreateProject}
+        <CreateBlueprintModal
+          open={showCreateBlueprintModal}
+          onOpenChange={setShowCreateBlueprintModal}
+          onCreateBlueprint={handleCreateBlueprint}
         />
-        <div 
+        <div
           className={cn(
             "flex h-full flex-col border-r border-border bg-secondary/20",
             isResizing && "transition-none"
@@ -447,21 +447,21 @@ export function ProjectExplorer({
           <div className="border-b border-border">
             <div className="flex h-9 items-center justify-between px-3">
               <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                Projects
+                Blueprints
               </span>
               <div className="flex items-center gap-1">
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <button
-                        onClick={() => setShowCreateProjectModal(true)}
+                        onClick={() => setShowCreateBlueprintModal(true)}
                         className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                       >
                         <Plus className="h-3.5 w-3.5" />
                       </button>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>Create Project</p>
+                      <p>Create Blueprint</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
@@ -484,24 +484,24 @@ export function ProjectExplorer({
             </div>
           </div>
 
-          {/* Projects List */}
+          {/* Blueprints List */}
           <div className="flex-1 overflow-auto py-2">
-            {isLoadingProjects ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground">Loading projects...</div>
-            ) : projects.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-muted-foreground">No projects</div>
+            {isLoadingBlueprints ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">Loading blueprints...</div>
+            ) : blueprints.length === 0 ? (
+              <div className="px-3 py-2 text-xs text-muted-foreground">No blueprints</div>
             ) : (
               <div className="px-2">
-                {projects.map((project) => (
+                {blueprints.map((blueprint) => (
                   <button
-                    key={project.project_id}
-                    onClick={() => router.push(`/app/${project.project_id}`)}
+                    key={blueprint.blueprint_id}
+                    onClick={() => router.push(`/app/${blueprint.blueprint_id}`)}
                     className="flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-xs hover:bg-accent"
                   >
                     <div className="flex-1 truncate">
-                      <div className="font-medium text-foreground">{project.name}</div>
+                      <div className="font-medium text-foreground">{blueprint.name}</div>
                       <div className="text-[10px] text-muted-foreground">
-                        {project.file_count} files
+                        {blueprint.file_count} files
                       </div>
                     </div>
                   </button>
@@ -513,12 +513,12 @@ export function ProjectExplorer({
           {/* Footer */}
           <div className="border-t border-border px-3 py-2">
             <Button
-              onClick={() => setShowCreateProjectModal(true)}
+              onClick={() => setShowCreateBlueprintModal(true)}
               className="w-full"
               size="sm"
             >
               <Plus className="mr-2 h-3.5 w-3.5" />
-              Create Project
+              Create Blueprint
             </Button>
           </div>
         </div>
@@ -568,35 +568,35 @@ export function ProjectExplorer({
               </TooltipContent>
             </Tooltip>
             {/* Dafny file button - check if any dfy files exist */}
-            {fileState.projectFiles.some(f => 
-              f.children?.some(c => c.type === 'dfy') || 
+            {fileState.blueprintFiles.some(f =>
+              f.children?.some(c => c.type === 'dfy') ||
               f.type === 'dfy'
             ) && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    onClick={async () => {
-                      await selectFile("spec.dfy");
-                      onFileSelect("spec.dfy");
-                    }}
-                    className={cn(
-                      "flex h-8 w-8 items-center justify-center rounded transition-colors",
-                      selectedFile === "spec.dfy" || selectedFile.endsWith(".dfy")
-                        ? "bg-accent text-primary"
-                        : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                    )}
-                  >
-                    <Shield className="h-4 w-4" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="right">
-                  <div className="flex items-center gap-2">
-                    <span>Spec.dfy</span>
-                    {/* Verification status removed - handled by VerificationContext */}
-                  </div>
-                </TooltipContent>
-              </Tooltip>
-            )}
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={async () => {
+                        await selectFile("spec.dfy");
+                        onFileSelect("spec.dfy");
+                      }}
+                      className={cn(
+                        "flex h-8 w-8 items-center justify-center rounded transition-colors",
+                        selectedFile === "spec.dfy" || selectedFile.endsWith(".dfy")
+                          ? "bg-accent text-primary"
+                          : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+                      )}
+                    >
+                      <Shield className="h-4 w-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <div className="flex items-center gap-2">
+                      <span>Spec.dfy</span>
+                      {/* Verification status removed - handled by VerificationContext */}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              )}
           </div>
         </div>
       </TooltipProvider>
@@ -604,51 +604,51 @@ export function ProjectExplorer({
   }
 
   return (
-    <div 
+    <div
       className={cn(
         "flex h-full flex-col border-r border-border bg-secondary/20",
         isResizing && "transition-none"
       )}
       style={{ width: width ? `${width}px` : '224px' }}
     >
-      {/* Header with Project Switcher */}
+      {/* Header with Blueprint Switcher */}
       <div className="border-b border-border">
-        {projectState.currentProject && (
+        {blueprintState.currentBlueprint && (
           <div className="px-2 py-1.5">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-accent">
                   <div className="flex-1 truncate">
-                    <div className="font-medium text-foreground">{projectState.currentProject.name}</div>
+                    <div className="font-medium text-foreground">{blueprintState.currentBlueprint.name}</div>
                     <div className="text-[10px] text-muted-foreground">
-                      {projectState.currentProject.file_count} files
+                      {blueprintState.currentBlueprint.file_count} files
                     </div>
                   </div>
                   <ChevronsUpDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className="w-56">
-                {isLoadingProjects ? (
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading projects...</div>
-                ) : projects.length === 0 ? (
-                  <div className="px-2 py-1.5 text-xs text-muted-foreground">No other projects</div>
+                {isLoadingBlueprints ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">Loading blueprints...</div>
+                ) : blueprints.length === 0 ? (
+                  <div className="px-2 py-1.5 text-xs text-muted-foreground">No other blueprints</div>
                 ) : (
-                  projects.map((project) => (
+                  blueprints.map((blueprint) => (
                     <DropdownMenuItem
-                      key={project.project_id}
-                      onClick={() => switchProject(project.project_id)}
+                      key={blueprint.blueprint_id}
+                      onClick={() => switchBlueprint(blueprint.blueprint_id)}
                       className={cn(
                         "flex items-center justify-between",
-                        project.project_id === projectState.projectId && "bg-accent"
+                        blueprint.blueprint_id === blueprintState.blueprintId && "bg-accent"
                       )}
                     >
                       <div className="flex-1 truncate">
-                        <div className="font-medium">{project.name}</div>
+                        <div className="font-medium">{blueprint.name}</div>
                         <div className="text-[10px] text-muted-foreground">
-                          {project.file_count} files
+                          {blueprint.file_count} files
                         </div>
                       </div>
-                      {project.project_id === projectState.projectId && (
+                      {blueprint.blueprint_id === blueprintState.blueprintId && (
                         <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
                       )}
                     </DropdownMenuItem>
@@ -715,14 +715,14 @@ export function ProjectExplorer({
 
       {/* File Tree */}
       <div className="flex-1 overflow-auto py-1">
-        {projectFiles.map((item) => (
+        {blueprintFiles.map((item) => (
           <FileTreeItem
             key={item.id}
             item={item}
             selectedFile={selectedFile}
             onFileSelect={async (fileId) => {
               // Use file_id if available, otherwise use id
-              const actualFileId = fileState.projectFiles
+              const actualFileId = fileState.blueprintFiles
                 .flatMap(f => f.children || [])
                 .find(f => f.id === fileId)?.file_id || fileId;
               await selectFile(actualFileId);
@@ -762,8 +762,8 @@ export function ProjectExplorer({
               onClick={() => setNewFileType('md')}
               className={cn(
                 "flex-1 rounded-lg border p-4 text-left transition-colors",
-                newFileType === 'md' 
-                  ? "border-primary bg-primary/10" 
+                newFileType === 'md'
+                  ? "border-primary bg-primary/10"
                   : "border-border hover:bg-accent"
               )}
             >
@@ -775,8 +775,8 @@ export function ProjectExplorer({
               onClick={() => setNewFileType('dfy')}
               className={cn(
                 "flex-1 rounded-lg border p-4 text-left transition-colors",
-                newFileType === 'dfy' 
-                  ? "border-primary bg-primary/10" 
+                newFileType === 'dfy'
+                  ? "border-primary bg-primary/10"
                   : "border-border hover:bg-accent"
               )}
             >
@@ -789,9 +789,9 @@ export function ProjectExplorer({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={async () => {
-                if (projectState.projectId) {
+                if (blueprintState.blueprintId) {
                   try {
-                    await createNewFile(newFileType, projectState.projectId);
+                    await createNewFile(newFileType, blueprintState.blueprintId);
                     setShowNewFileDialog(false);
                   } catch (error) {
                     toast.error(`Failed to create file: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -808,9 +808,9 @@ export function ProjectExplorer({
       {/* Footer */}
       <div className="border-t border-border px-3 py-2">
         <p className="text-[10px] text-muted-foreground/70">
-          {stats.units > 0 
+          {stats.units > 0
             ? `${stats.units} units | ${stats.verified} verified | ${stats.failed} failed`
-            : fileState.projectFiles.some(f => f.type === 'dfy' || f.children?.some(c => c.type === 'dfy')) ? '1 spec file' : 'No spec generated yet'
+            : fileState.blueprintFiles.some(f => f.type === 'dfy' || f.children?.some(c => c.type === 'dfy')) ? '1 spec file' : 'No spec generated yet'
           }
         </p>
       </div>
@@ -822,16 +822,16 @@ export function ProjectExplorer({
 function updateVerificationStatus(files: FileItem[], verified?: boolean): FileItem[] {
   return files.map(file => {
     const newFile = { ...file };
-    
+
     // Update dfy files based on verification
     if (file.type === 'dfy' && verified !== undefined) {
       newFile.verificationStatus = verified ? 'verified' : 'failed';
     }
-    
+
     if (file.children) {
       newFile.children = updateVerificationStatus(file.children, verified);
     }
-    
+
     return newFile;
   });
 }

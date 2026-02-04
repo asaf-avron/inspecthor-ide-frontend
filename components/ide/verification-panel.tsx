@@ -9,7 +9,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { useVerificationContext } from "@/lib/contexts/verification-context";
 import type { ProofObligation } from "@/lib/types";
@@ -59,7 +59,7 @@ const defaultProofObligations: ProofObligation[] = [
 ];
 
 export function VerificationPanel() {
-  const { state: projectState } = useProject();
+  const { state: blueprintState } = useBlueprint();
   const { state: fileState } = useFileContext();
   const { state: verificationState, runVerification } = useVerificationContext();
 
@@ -72,8 +72,8 @@ export function VerificationPanel() {
       return verificationState.proofObligations;
     }
     // If we have gaps from spec generation, show them as pending
-    if (projectState.gaps.length > 0) {
-      return projectState.gaps.map((gap, i) => ({
+    if (blueprintState.gaps.length > 0) {
+      return blueprintState.gaps.map((gap, i) => ({
         id: gap.id || `gap-${i}`,
         name: gap.description,
         location: gap.location?.file || 'Spec.dfy',
@@ -83,7 +83,7 @@ export function VerificationPanel() {
       }));
     }
     return defaultProofObligations;
-  }, [verificationState.proofObligations, projectState.gaps]);
+  }, [verificationState.proofObligations, blueprintState.gaps]);
 
   const verifiedCount = proofObligations.filter(p => p.status === "verified").length;
   const failedCount = proofObligations.filter(p => p.status === "failed").length;
@@ -143,8 +143,8 @@ export function VerificationPanel() {
           {/* Verification Results Summary */}
           {verificationState.verificationResults && (
             <div className={`mt-2 rounded px-2 py-1 text-xs ${verificationState.verificationResults.verified
-                ? "bg-primary/20 text-primary"
-                : "bg-destructive/20 text-destructive"
+              ? "bg-primary/20 text-primary"
+              : "bg-destructive/20 text-destructive"
               }`}>
               {verificationState.verificationResults.verified
                 ? `Verification passed in ${verificationState.verificationResults.verification_time_ms}ms`

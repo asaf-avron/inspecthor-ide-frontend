@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Sparkles, Send, User, ChevronDown, Lightbulb, Code2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { useVerificationContext } from "@/lib/contexts/verification-context";
 import type { ChatMessage } from "@/lib/types";
@@ -14,7 +14,7 @@ interface Message extends ChatMessage {
 }
 
 export function GeminiInsightPanel() {
-  const { state: projectState, sendChatMessage } = useProject();
+  const { state: blueprintState, sendChatMessage } = useBlueprint();
   const { state: fileState } = useFileContext();
   const { state: verificationState } = useVerificationContext();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -24,7 +24,7 @@ export function GeminiInsightPanel() {
   // Build context from verification errors
   const verificationContext = useMemo(() => {
     if (!verificationState.verificationResults?.errors?.length) return null;
-    
+
     const firstError = verificationState.verificationResults.errors[0];
     const dafnyCode = fileState.activeFile?.fileType === 'dfy' ? fileState.activeFile.content : '';
     return {
@@ -41,7 +41,7 @@ export function GeminiInsightPanel() {
   useEffect(() => {
     if (verificationState.verificationResults && messages.length === 0) {
       const errors = verificationState.verificationResults.errors;
-      
+
       if (errors && errors.length > 0) {
         const initialMessage: Message = {
           id: 'initial',
@@ -79,7 +79,7 @@ Your specification is formally verified. Would you like me to explain any of the
 
   // Show welcome message if no verification yet
   useEffect(() => {
-    if (!verificationState.verificationResults && messages.length === 0 && projectState.hasProject) {
+    if (!verificationState.verificationResults && messages.length === 0 && blueprintState.hasBlueprint) {
       setMessages([{
         id: 'welcome',
         role: 'assistant',
@@ -99,7 +99,7 @@ Run verification on your Dafny code, and I'll automatically analyze any errors.`
         ],
       }]);
     }
-  }, [projectState.hasProject, verificationState.verificationResults, messages.length]);
+  }, [blueprintState.hasBlueprint, verificationState.verificationResults, messages.length]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -117,7 +117,7 @@ Run verification on your Dafny code, and I'll automatically analyze any errors.`
 
     try {
       const response = await sendChatMessage(input, verificationContext || undefined);
-      
+
       if (response) {
         const aiResponse: Message = {
           id: (Date.now() + 1).toString(),
@@ -160,7 +160,7 @@ Run verification on your Dafny code, and I'll automatically analyze any errors.`
           <span className="text-sm font-medium text-foreground">Verification Assistant</span>
         </div>
         <div className="flex items-center gap-2">
-          {!projectState.geminiConfigured && (
+          {!blueprintState.geminiConfigured && (
             <div className="flex items-center gap-1 text-xs text-warning">
               <AlertCircle className="h-3 w-3" />
               <span>Gemini not configured</span>

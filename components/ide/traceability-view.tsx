@@ -9,8 +9,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { useProject } from "@/lib/project-context";
-import type { ReferenceMapping, ProjectFileItem } from "@/lib/types";
+import { useBlueprint } from "@/lib/blueprint-context";
+import type { ReferenceMapping, BlueprintFileItem } from "@/lib/types";
 
 interface TraceabilityViewProps {
   selectedFile: string;
@@ -19,7 +19,7 @@ interface TraceabilityViewProps {
   leftPaneWidth?: number; // Percentage width for left pane (default 50)
   isResizing?: boolean;
   onResizeStart?: (e: React.MouseEvent) => void;
-  projectFiles?: ProjectFileItem[]; // File tree for breadcrumbs
+  projectFiles?: BlueprintFileItem[]; // File tree for breadcrumbs
 }
 
 function ReferenceBadge({
@@ -111,10 +111,10 @@ export function TraceabilityView({
   onResizeStart,
   projectFiles = [],
 }: TraceabilityViewProps) {
-  const { state } = useProject();
+  const { state } = useBlueprint();
 
   // Helper function to find path in project tree
-  const findPath = (items: ProjectFileItem[], targetId: string, path: ProjectFileItem[] = []): ProjectFileItem[] | null => {
+  const findPath = (items: BlueprintFileItem[], targetId: string, path: BlueprintFileItem[] = []): BlueprintFileItem[] | null => {
     for (const item of items) {
       const currentPath = [...path, item];
 
@@ -137,7 +137,7 @@ export function TraceabilityView({
     }
 
     // Find first markdown file in project tree
-    const findMarkdownFile = (items: ProjectFileItem[]): ProjectFileItem | null => {
+    const findMarkdownFile = (items: BlueprintFileItem[]): BlueprintFileItem | null => {
       for (const item of items) {
         if (item.type === 'md') {
           return item;
@@ -165,7 +165,7 @@ export function TraceabilityView({
     }
 
     // Find first dafny file in project tree
-    const findDafnyFile = (items: ProjectFileItem[]): ProjectFileItem | null => {
+    const findDafnyFile = (items: BlueprintFileItem[]): BlueprintFileItem | null => {
       for (const item of items) {
         if (item.type === 'dfy') {
           return item;

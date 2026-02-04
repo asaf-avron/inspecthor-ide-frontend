@@ -82,9 +82,9 @@ export function BlueprintInitModal({
                 setCountdown(countdown - 1);
             }, 1000);
             return () => clearTimeout(timer);
-        } else if (state === "success" && countdown === 0 && result?.blueprint_id) {
+        } else if (state === "success" && countdown === 0 && result?.blueprint.blueprint_id) {
             // Navigate to IDE with the new project
-            const blueprintId = result.blueprint_id;
+            const blueprintId = result.blueprint.blueprint_id;
             handleClose();
             router.push(`/app/${blueprintId}`);
         }
@@ -148,11 +148,11 @@ export function BlueprintInitModal({
 
         try {
             const response = await initializeBlueprint({
-                name: name.trim(),
-                repository_url: repo.html_url,
+                owner: repo.owner,
+                repo_name: repo.name,
                 installation_id: installationId || 0,
-                domain,
-                force,
+                blueprint_name: name.trim(),
+                description: repo.description,
             });
 
             setResult(response);
@@ -182,7 +182,7 @@ export function BlueprintInitModal({
     };
 
     const handleOpenProject = () => {
-        const blueprintId = result?.blueprint_id;
+        const blueprintId = result?.blueprint.blueprint_id;
         handleClose();
         if (blueprintId) {
             router.push(`/app/${blueprintId}`);
@@ -344,7 +344,7 @@ export function BlueprintInitModal({
                         <div className="space-y-3">
                             <div>
                                 <p className="text-sm font-medium text-muted-foreground">Commit</p>
-                                <code className="text-sm">{result.commit_sha.slice(0, 7)}</code>
+                                <code className="text-sm">{result.commit_sha?.slice(0, 7) || "N/A"}</code>
                             </div>
 
                             <div>
@@ -366,7 +366,7 @@ export function BlueprintInitModal({
                         <DialogFooter className="mt-2">
                             <Button
                                 variant="outline"
-                                onClick={() => window.open(result.commit_url, "_blank")}
+                                onClick={() => window.open(result.github_url, "_blank")}
                                 className="gap-2"
                             >
                                 <ExternalLink className="h-4 w-4" />

@@ -53,22 +53,19 @@ export interface SpecStatistics {
 export type BlueprintDomain = "banking" | "healthcare" | "authentication" | "custom";
 
 export interface BlueprintInitRequest {
-    name: string;
-    repository_url: string;
+    owner: string;
+    repo_name: string;
     installation_id: number;
-    domain?: BlueprintDomain;
-    force?: boolean;
+    blueprint_name: string;
+    description?: string;
 }
 
 export interface BlueprintInitResponse {
-    blueprint_id: string;
-    name: string;
-    repository_url: string;
+    blueprint: BlueprintResponse;
+    github_url: string;
     commit_sha: string;
-    commit_url: string;
     files_created: string[];
-    default_branch: string;
-    next_steps: string[];
+    setup_status: "success" | "partial" | "failed";
 }
 
 export interface GenerateSpecOptions {
@@ -82,7 +79,7 @@ export interface GenerateSpecRequest {
     rigor_level?: RigorLevel;
     options?: GenerateSpecOptions;
     current_filename?: string;
-    project_id?: string;
+    blueprint_id?: string;
     source_file_id?: string;
 }
 
@@ -186,7 +183,7 @@ export interface FileSaveRequest {
     filename: string;
     content: string;
     file_type: FileType;
-    project_id: string;  // Required - files must belong to a project
+    blueprint_id: string;  // Required - files must belong to a blueprint
 }
 
 export interface FileUpdateRequest {
@@ -206,7 +203,7 @@ export interface FileResponse {
     filename: string;
     content: string;
     file_type: string;
-    project_id: string;
+    blueprint_id: string;
     created_at: string;
     updated_at: string;
     size_bytes: number;
@@ -232,45 +229,49 @@ export interface FileDeleteResponse {
     file_id: string;
 }
 
-// === Project Management Types ===
-export interface Project {
-    project_id: string;
+// === Blueprint Management Types ===
+export interface Blueprint {
+    blueprint_id: string;
     name: string;
     description: string | null;
     created_at: string;
     updated_at: string;
     file_count: number;
+    repository_url?: string;
+    default_branch?: string;
 }
 
-export interface ProjectCreateRequest {
+export interface BlueprintCreateRequest {
     name: string;
     description?: string;
 }
 
-export interface ProjectUpdateRequest {
+export interface BlueprintUpdateRequest {
     name?: string;
     description?: string;
 }
 
-export interface ProjectResponse {
-    project_id: string;
+export interface BlueprintResponse {
+    blueprint_id: string;
     name: string;
     description: string | null;
     created_at: string;
     updated_at: string;
     file_count: number;
     redirect_url?: string;
+    repository_url?: string;
+    default_branch?: string;
 }
 
-export interface ProjectListParams {
+export interface BlueprintListParams {
     limit?: number;
     offset?: number;
     sort?: "created_at" | "updated_at" | "name";
     order?: "asc" | "desc";
 }
 
-export interface ProjectListResponse {
-    projects: ProjectResponse[];
+export interface BlueprintListResponse {
+    blueprints: BlueprintResponse[];
     total: number;
     limit: number;
     offset: number;
@@ -284,14 +285,14 @@ export interface FileMetadata {
     size_bytes: number;
 }
 
-export interface ProjectStructureResponse {
-    project: ProjectResponse;
+export interface BlueprintStructureResponse {
+    blueprint: BlueprintResponse;
     files: FileMetadata[];
 }
 
-export interface ProjectDeleteResponse {
+export interface BlueprintDeleteResponse {
     deleted: boolean;
-    project_id: string;
+    blueprint_id: string;
     files_deleted: number;
 }
 
@@ -335,7 +336,7 @@ export interface SuggestResponse {
 // === Spec Refinement Types ===
 export interface FindGapsRequest {
     spec: string;
-    project_id?: string;
+    blueprint_id?: string;
     source_file_id?: string;
 }
 
@@ -363,17 +364,17 @@ export interface HealthResponse {
     dafny_available: boolean;
 }
 
-// === Project Explorer Types (Frontend-specific) ===
-export type ProjectFileType = "md" | "dfy" | "folder" | "unit";
-export type ProjectVerificationStatus = "verified" | "failed" | "pending" | "none";
+// === Blueprint Explorer Types (Frontend-specific) ===
+export type BlueprintFileType = "md" | "dfy" | "folder" | "unit";
+export type BlueprintVerificationStatus = "verified" | "failed" | "pending" | "none";
 
-export interface ProjectFileItem {
+export interface BlueprintFileItem {
     id: string;
     name: string;
-    type: ProjectFileType;
+    type: BlueprintFileType;
     linkedDfy?: string;
-    verificationStatus?: ProjectVerificationStatus;
-    children?: ProjectFileItem[];
+    verificationStatus?: BlueprintVerificationStatus;
+    children?: BlueprintFileItem[];
     // API fields
     file_id?: string;
     content?: string;
@@ -431,7 +432,7 @@ export interface DeconstructStats {
 }
 
 export interface DeconstructRequest {
-    project_id: string;
+    blueprint_id: string;
     source_file_id: string;
     strategy?: "auto" | "manual";
     max_units?: number;
@@ -472,7 +473,7 @@ export interface ActiveFileState {
     lastSavedAt: Date | null;
     filename: string;
     fileType: FileType;
-    projectId: string;
+    blueprintId: string;
 }
 
 export interface FileCache {

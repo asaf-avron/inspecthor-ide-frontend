@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { File, X, ChevronRight, Save } from "lucide-react";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { useVerificationContext } from "@/lib/contexts/verification-context";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
@@ -14,14 +14,14 @@ interface CodeEditorProps {
 }
 
 export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
-  const { state: projectState } = useProject();
+  const { state: blueprintState } = useBlueprint();
   const { state: fileState, updateFileContent, forceSaveCurrentFile } = useFileContext();
   const { state: verificationState } = useVerificationContext();
   const [activeTab, setActiveTab] = useState(selectedFile === "utils.dfy" ? "Utils.dfy" : "Spec.dfy");
-  
+
   // Get current file content from activeFile
   const currentCode = fileState.activeFile?.content || '';
-  
+
   // Auto-save hook
   const autoSave = useAutoSave({
     fileId: fileState.activeFile?.id || null,
@@ -83,30 +83,28 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
         <div className="flex items-center">
           <button
             onClick={() => setActiveTab("Spec.dfy")}
-            className={`group flex h-9 items-center gap-2 border-r border-border px-3 text-xs ${
-              activeTab === "Spec.dfy"
-                ? "bg-background text-foreground"
-                : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
-            }`}
+            className={`group flex h-9 items-center gap-2 border-r border-border px-3 text-xs ${activeTab === "Spec.dfy"
+              ? "bg-background text-foreground"
+              : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+              }`}
           >
             <File className="h-3.5 w-3.5 text-primary" />
             <span>{filename}</span>
             {fileState.activeFile && activeTab === "Spec.dfy" && (
-              <SaveStatusIndicator 
-                status={autoSave.status} 
+              <SaveStatusIndicator
+                status={autoSave.status}
                 onRetry={autoSave.retrySave}
               />
             )}
             <X className="h-3 w-3 opacity-0 group-hover:opacity-60" />
           </button>
-          {fileState.projectFiles.some(f => f.children?.some(c => c.id === 'utils.dfy')) && (
+          {fileState.blueprintFiles.some(f => f.children?.some(c => c.id === 'utils.dfy')) && (
             <button
               onClick={() => setActiveTab("Utils.dfy")}
-              className={`group flex h-9 items-center gap-2 border-r border-border px-3 text-xs ${
-                activeTab === "Utils.dfy"
-                  ? "bg-background text-foreground"
-                  : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
-              }`}
+              className={`group flex h-9 items-center gap-2 border-r border-border px-3 text-xs ${activeTab === "Utils.dfy"
+                ? "bg-background text-foreground"
+                : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+                }`}
             >
               <File className="h-3.5 w-3.5 text-muted-foreground" />
               <span>Utils.dfy</span>
@@ -114,7 +112,7 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
             </button>
           )}
         </div>
-        
+
         {/* Save Button */}
         <div className="pr-2">
           {fileState.activeFile && autoSave.status !== 'clean' && (
@@ -138,11 +136,10 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
         <ChevronRight className="h-3 w-3" />
         <span className="text-foreground">{filename}</span>
         {verificationState.verificationResults && (
-          <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium ${
-            verificationState.verificationResults.verified 
-              ? "bg-primary/20 text-primary" 
-              : "bg-destructive/20 text-destructive"
-          }`}>
+          <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-medium ${verificationState.verificationResults.verified
+            ? "bg-primary/20 text-primary"
+            : "bg-destructive/20 text-destructive"
+            }`}>
             {verificationState.verificationResults.verified ? "Verified" : "Failed"}
           </span>
         )}
@@ -154,8 +151,8 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
           {/* Line Numbers */}
           <div className="sticky left-0 z-10 flex flex-col bg-background pr-2 text-right text-muted-foreground/60 select-none">
             {codeLines.map((_, i) => (
-              <div 
-                key={i} 
+              <div
+                key={i}
                 className={`px-3 ${errorLines.has(i + 1) ? "bg-destructive/20 text-destructive" : ""}`}
               >
                 {i + 1}
@@ -168,15 +165,15 @@ export function CodeEditor({ selectedFile = "spec.dfy" }: CodeEditorProps) {
             {/* Syntax highlighted background */}
             <pre className="pointer-events-none absolute inset-0 pl-2 text-foreground">
               {codeLines.map((line, i) => (
-                <div 
-                  key={i} 
+                <div
+                  key={i}
                   className={`${errorLines.has(i + 1) ? "bg-destructive/20" : "hover:bg-accent/30"}`}
                 >
                   <CodeLine line={line} isError={errorLines.has(i + 1)} />
                 </div>
               ))}
             </pre>
-            
+
             {/* Editable textarea */}
             <textarea
               value={displayCode}
@@ -203,9 +200,9 @@ function CodeLine({ line, isError }: { line: string; isError?: boolean }) {
     .replace(/\b(\d+)\b/g, '<span class="text-syntax-number">$1</span>');
 
   return (
-    <code 
+    <code
       className={isError ? "block" : ""}
-      dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }} 
+      dangerouslySetInnerHTML={{ __html: highlightedLine || "&nbsp;" }}
     />
   );
 }

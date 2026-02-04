@@ -2,11 +2,11 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { useVerificationContext } from "@/lib/contexts/verification-context";
 import { Header, ViewMode } from "@/components/ide/header";
-import { ProjectExplorer } from "@/components/ide/project-explorer";
+import { BlueprintExplorer } from "@/components/ide/blueprint-explorer";
 import { CodeEditor } from "@/components/ide/code-editor";
 import { MarkdownEditor } from "@/components/ide/markdown-editor";
 import { VerificationPanel } from "@/components/ide/verification-panel";
@@ -18,38 +18,38 @@ import { CheckCircle2, Sparkles, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
-export default function ProjectPage() {
+export default function BlueprintPage() {
   const params = useParams();
   const router = useRouter();
-  const projectId = params?.projectId as string | undefined;
+  const blueprintId = params?.blueprintId as string | undefined;
 
   const {
-    state: projectState,
-    loadProjectFromUrl,
+    state: blueprintState,
+    loadBlueprintFromUrl,
     checkHealth,
     generateSpec,
     hasUnits,
     deconstructToUnits,
     addLog,
-  } = useProject();
+  } = useBlueprint();
   const { state: fileState, selectFile } = useFileContext();
   const { state: verificationState, runVerification } = useVerificationContext();
 
-  // Load project from URL on mount
+  // Load blueprint from URL on mount
   useEffect(() => {
-    if (!projectId) {
+    if (!blueprintId) {
       router.push('/app');
       return;
     }
 
-    if (projectId !== projectState.projectId) {
-      loadProjectFromUrl(projectId).catch((error: any) => {
+    if (blueprintId !== blueprintState.blueprintId) {
+      loadBlueprintFromUrl(blueprintId).catch((error: any) => {
         if (error.status === 404 || error.status === 403) {
           router.push('/app');
         }
       });
     }
-  }, [projectId, projectState.projectId, loadProjectFromUrl, router]);
+  }, [blueprintId, blueprintState.blueprintId, loadBlueprintFromUrl, router]);
 
   // Check backend health on mount
   useEffect(() => {
@@ -90,14 +90,14 @@ export default function ProjectPage() {
   }, [generateSpec, fileState.activeFile]);
 
   // Show toast notification when spec generation completes
-  const prevIsGenerating = useRef(projectState.isGenerating);
+  const prevIsGenerating = useRef(blueprintState.isGenerating);
   useEffect(() => {
     // Detect transition from generating to not generating
-    if (prevIsGenerating.current && !projectState.isGenerating) {
+    if (prevIsGenerating.current && !blueprintState.isGenerating) {
       // Check if we have traceability data (indicates successful generation)
-      if (projectState.traceabilityMatrix.length > 0 || projectState.generatedSpec) {
+      if (blueprintState.traceabilityMatrix.length > 0 || blueprintState.generatedSpec) {
         toast.success('Specification generated!', {
-          description: `${projectState.traceabilityMatrix.length} requirements mapped`,
+          description: `${blueprintState.traceabilityMatrix.length} requirements mapped`,
           action: {
             label: 'View Trace',
             onClick: () => setViewMode('trace'),
@@ -106,8 +106,8 @@ export default function ProjectPage() {
         });
       }
     }
-    prevIsGenerating.current = projectState.isGenerating;
-  }, [projectState.isGenerating, projectState.traceabilityMatrix.length, projectState.generatedSpec]);
+    prevIsGenerating.current = blueprintState.isGenerating;
+  }, [blueprintState.isGenerating, blueprintState.traceabilityMatrix.length, blueprintState.generatedSpec]);
 
   const handleFileSelect = useCallback((fileId: string) => {
     selectFile(fileId);
@@ -305,17 +305,17 @@ export default function ProjectPage() {
     }
   }, [selectedFile, fileState.files, hasUnits]);
 
-  // Show loading state or redirect if no projectId
-  if (!projectId) {
+  // Show loading state or redirect if no blueprintId
+  if (!blueprintId) {
     return null; // Will redirect in useEffect
   }
 
-  if (projectState.isLoading || !projectState.currentProject) {
+  if (blueprintState.isLoading || !blueprintState.currentBlueprint) {
     return (
       <div className="flex h-screen items-center justify-center">
         <div className="text-center">
           <div className="mb-4 h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent mx-auto" />
-          <p className="text-muted-foreground">Loading project...</p>
+          <p className="text-muted-foreground">Loading blueprint...</p>
         </div>
       </div>
     );
@@ -333,17 +333,17 @@ export default function ProjectPage() {
           onRunVerification={handleRunVerification}
           isVerifying={verificationState.isVerifying}
           showVerification={true}
-          hasProject={true}
+          hasBlueprint={true}
           viewMode={viewMode}
           onViewModeChange={handleViewModeChange}
         />
         <div className="flex flex-1 overflow-hidden">
-          <ProjectExplorer
+          <BlueprintExplorer
             selectedFile={selectedFile || ''}
             onFileSelect={handleFileSelect}
             isCollapsed={isExplorerCollapsed}
             onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
-            hasProject={projectState.hasProject}
+            hasBlueprint={blueprintState.hasBlueprint}
             width={isExplorerCollapsed ? undefined : explorerWidth}
             isResizing={isResizingExplorer}
           />
@@ -363,7 +363,7 @@ export default function ProjectPage() {
               leftPaneWidth={tracePaneWidth}
               isResizing={isResizingTrace}
               onResizeStart={handleTraceResizeStart}
-              projectFiles={fileState.projectFiles}
+              projectFiles={fileState.blueprintFiles}
             />
           </div>
         </div>
@@ -378,7 +378,7 @@ export default function ProjectPage() {
         <TerminalPanel
           isCollapsed={isTerminalCollapsed}
           onToggle={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
-          isGenerating={projectState.isGenerating}
+          isGenerating={blueprintState.isGenerating}
           height={isTerminalCollapsed ? undefined : terminalHeight}
           isResizing={isResizingTerminal}
         />
@@ -393,17 +393,17 @@ export default function ProjectPage() {
         onRunVerification={handleRunVerification}
         isVerifying={verificationState.isVerifying}
         showVerification={!!isDafnyFile}
-        hasProject={true}
+        hasBlueprint={true}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
       />
       <div className="flex flex-1 overflow-hidden">
-        <ProjectExplorer
+        <BlueprintExplorer
           selectedFile={selectedFile || ''}
           onFileSelect={handleFileSelect}
           isCollapsed={isExplorerCollapsed}
           onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
-          hasProject={projectState.hasProject}
+          hasBlueprint={blueprintState.hasBlueprint}
           width={isExplorerCollapsed ? undefined : explorerWidth}
         />
         {!isExplorerCollapsed && (
@@ -418,7 +418,7 @@ export default function ProjectPage() {
           <div className="flex flex-1 flex-col overflow-hidden">
             <MarkdownEditor
               onGenerateSpec={handleGenerateSpec}
-              isGenerating={projectState.isGenerating}
+              isGenerating={blueprintState.isGenerating}
               isRootFile={isRootFile}
             />
           </div>
@@ -496,7 +496,7 @@ export default function ProjectPage() {
       <TerminalPanel
         isCollapsed={isTerminalCollapsed}
         onToggle={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
-        isGenerating={projectState.isGenerating || projectState.isDeconstructing}
+        isGenerating={blueprintState.isGenerating || blueprintState.isDeconstructing}
         height={isTerminalCollapsed ? undefined : terminalHeight}
         isResizing={isResizingTerminal}
       />
