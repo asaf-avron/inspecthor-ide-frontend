@@ -592,3 +592,83 @@ export interface DriftHealthResponse {
     issues_count: number;
     last_scan: string | null;
 }
+
+// === Diagram Generation Types ===
+export type DiagramSourceType = "spec" | "code";
+export type DiagramFormat = "mermaid" | "plantuml";
+
+export interface GenerateDiagramRequest {
+    source_type: DiagramSourceType;
+    source_content: string;
+    format?: DiagramFormat;
+}
+
+export interface GenerateDiagramResponse {
+    success: boolean;
+    diagram_code: string;
+    format: DiagramFormat;
+    nodes_count: number;
+    edges_count: number;
+}
+
+export interface CompareDiagramsRequest {
+    expected_diagram: string;
+    actual_diagram: string;
+}
+
+export interface DiagramDifference {
+    type: "missing_node" | "extra_node" | "missing_edge" | "extra_edge" | "modified_node";
+    description: string;
+    severity: "critical" | "high" | "medium" | "low";
+}
+
+export interface CompareDiagramsResponse {
+    similarity_score: number;
+    differences: DiagramDifference[];
+    matching_nodes: string[];
+    matching_edges: string[];
+    missing_nodes: string[];
+    extra_nodes: string[];
+    missing_edges: string[];
+    extra_edges: string[];
+}
+
+// === Harmonization Types ===
+export type SyncStatus = "synchronized" | "desynchronized" | "verifying" | "error";
+export type HarmonizationStrategy = "incremental" | "full" | "manual";
+
+export interface HarmonizationStatusResponse {
+    blueprint_id: string;
+    status: SyncStatus;
+    last_sync: string | null;
+    spec_modified: string | null;
+    dafny_modified: string | null;
+    needs_harmonization: boolean;
+    verification_passing: boolean;
+}
+
+export interface SpecDiffResponse {
+    blueprint_id: string;
+    has_changes: boolean;
+    added_requirements: string[];
+    removed_requirements: string[];
+    modified_requirements: string[];
+    diff_summary: string;
+}
+
+export interface HarmonizeRequest {
+    blueprint_id: string;
+    strategy: HarmonizationStrategy;
+    force?: boolean;
+}
+
+export interface HarmonizeResponse {
+    success: boolean;
+    status: SyncStatus;
+    steps_completed: string[];
+    verification_result?: {
+        passed: boolean;
+        errors: string[];
+    };
+    message: string;
+}
