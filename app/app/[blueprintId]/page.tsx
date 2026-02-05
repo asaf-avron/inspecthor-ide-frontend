@@ -13,8 +13,9 @@ import { VerificationPanel } from "@/components/ide/verification-panel";
 import { GeminiInsightPanel } from "@/components/ide/gemini-insight-panel";
 import { TerminalPanel } from "@/components/ide/terminal-panel";
 import { TraceabilityView } from "@/components/ide/traceability-view";
+import { ProofLedgerPanel, DriftDetectorPanel } from "@/components/brain";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CheckCircle2, Sparkles, GripVertical } from "lucide-react";
+import { CheckCircle2, Sparkles, GripVertical, Shield, Activity } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -468,6 +469,20 @@ export default function BlueprintPage() {
                       <Sparkles className="h-3.5 w-3.5" />
                       Gemini Insight
                     </TabsTrigger>
+                    <TabsTrigger
+                      value="ledger"
+                      className="relative h-9 gap-1.5 rounded-none border-r border-border bg-transparent px-3 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground"
+                    >
+                      <Shield className="h-3.5 w-3.5" />
+                      Proof Ledger
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="drift"
+                      className="relative h-9 gap-1.5 rounded-none border-r border-border bg-transparent px-3 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground"
+                    >
+                      <Activity className="h-3.5 w-3.5" />
+                      Component Health
+                    </TabsTrigger>
                   </TabsList>
                 </div>
                 <TabsContent value="verification" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
@@ -475,6 +490,17 @@ export default function BlueprintPage() {
                 </TabsContent>
                 <TabsContent value="gemini" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                   <GeminiInsightPanel />
+                </TabsContent>
+                <TabsContent value="ledger" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                  <ProofLedgerPanel
+                    componentUuid={blueprintState.blueprintId || 'unknown'}
+                    componentName={blueprintState.name || 'Component'}
+                  />
+                </TabsContent>
+                <TabsContent value="drift" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                  <DriftDetectorPanel
+                    repoPath={repoPath || '/default/repo/path'}
+                  />
                 </TabsContent>
               </Tabs>
             </div>

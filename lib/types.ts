@@ -483,3 +483,112 @@ export interface FileCache {
         fileType: string;
     }
 }
+
+// === Proof Ledger Types ===
+export type LedgerVerificationStatus = "verified" | "failed" | "timeout" | "error";
+
+export interface LedgerEntry {
+    entry_id: string;
+    component_uuid: string;
+    timestamp: string;
+    dafny_content_hash: string;
+    verification_status: LedgerVerificationStatus;
+    proof_obligations_proven: number;
+    proof_obligations_total: number;
+    dafny_version: string;
+    signature: string;
+    previous_hash: string | null;
+    entry_number: number;
+}
+
+export interface LedgerHistoryResponse {
+    component_uuid: string;
+    entries: LedgerEntry[];
+    total_entries: number;
+}
+
+export interface ChainIntegrityResponse {
+    component_uuid: string;
+    chain_valid: boolean;
+    total_entries: number;
+    broken_links: number[];
+    errors: string[];
+}
+
+export interface LatestEntryResponse {
+    component_uuid: string;
+    entry: LedgerEntry | null;
+    has_history: boolean;
+}
+
+export interface CodeComparisonResponse {
+    uuid: string;
+    entry_id: string;
+    verified_hash: string;
+    current_hash: string;
+    hash_match: boolean;
+    verified_code: string;
+    current_code: string;
+    diff: {
+        added_lines: number[];
+        removed_lines: number[];
+        modified_lines: number[];
+    };
+    changes_summary: string[];
+}
+
+// === Drift Detection Types ===
+export type DriftIssueType = "moved" | "corrupted" | "missing" | "orphaned";
+export type DriftRepairAction = "update_registry" | "regenerate" | "register" | "delete";
+
+export interface DriftIssue {
+    uuid: string;
+    component_name: string;
+    issue_type: DriftIssueType;
+    expected_path: string | null;
+    found_path: string | null;
+    description: string;
+    severity: "critical" | "high" | "medium" | "low";
+    can_auto_repair: boolean;
+    suggested_action: DriftRepairAction;
+}
+
+export interface DriftScanResponse {
+    success: boolean;
+    repo_path: string;
+    scan_timestamp: string;
+    total_components: number;
+    issues: DriftIssue[];
+    health_score: number;
+}
+
+export interface DriftRepairRequest {
+    uuid: string;
+    action: DriftRepairAction;
+    new_path?: string;
+}
+
+export interface DriftRepairResponse {
+    success: boolean;
+    uuid: string;
+    action: DriftRepairAction;
+    message: string;
+}
+
+export interface DriftAutoRepairResponse {
+    success: boolean;
+    repaired_count: number;
+    failed_count: number;
+    repaired_components: string[];
+    failed_components: string[];
+    errors: string[];
+}
+
+export interface DriftHealthResponse {
+    repo_path: string;
+    health_score: number;
+    total_components: number;
+    healthy_components: number;
+    issues_count: number;
+    last_scan: string | null;
+}
