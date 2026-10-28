@@ -14,17 +14,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 
-interface CreateProjectModalProps {
+interface CreateBlueprintModalProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    onCreateProject: (name: string, description?: string) => Promise<void>;
+    onCreateBlueprint: (name: string, description?: string) => Promise<void>;
 }
 
-export function CreateProjectModal({ 
-    open, 
-    onOpenChange, 
-    onCreateProject 
-}: CreateProjectModalProps) {
+export function CreateBlueprintModal({
+    open,
+    onOpenChange,
+    onCreateBlueprint
+}: CreateBlueprintModalProps) {
     const [name, setName] = useState("");
     const [description, setDescription] = useState("");
     const [isCreating, setIsCreating] = useState(false);
@@ -32,9 +32,9 @@ export function CreateProjectModal({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         if (!name.trim()) {
-            setError("Project name is required");
+            setError("Blueprint name is required");
             return;
         }
 
@@ -42,13 +42,13 @@ export function CreateProjectModal({
         setError(null);
 
         try {
-            await onCreateProject(name.trim(), description.trim() || undefined);
+            await onCreateBlueprint(name.trim(), description.trim() || undefined);
             // Reset form
             setName("");
             setDescription("");
             onOpenChange(false);
         } catch (error) {
-            setError(error instanceof Error ? error.message : "Failed to create project");
+            setError(error instanceof Error ? error.message : "Failed to create blueprint");
         } finally {
             setIsCreating(false);
         }
@@ -68,20 +68,20 @@ export function CreateProjectModal({
             <DialogContent className="sm:max-w-md">
                 <form onSubmit={handleSubmit}>
                     <DialogHeader>
-                        <DialogTitle>Create New Project</DialogTitle>
+                        <DialogTitle>Create New Blueprint</DialogTitle>
                         <DialogDescription>
-                            Start a new formal verification project with a blank canvas
+                            Start a new formal verification blueprint with a blank canvas
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4 py-4">
                         <div className="space-y-2">
-                            <Label htmlFor="project-name">
-                                Project Name <span className="text-destructive">*</span>
+                            <Label htmlFor="blueprint-name">
+                                Blueprint Name <span className="text-destructive">*</span>
                             </Label>
                             <Input
-                                id="project-name"
-                                placeholder="My Verification Project"
+                                id="blueprint-name"
+                                placeholder="My Verification Blueprint"
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
                                 disabled={isCreating}
@@ -90,11 +90,11 @@ export function CreateProjectModal({
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="project-description">
+                            <Label htmlFor="blueprint-description">
                                 Description (Optional)
                             </Label>
                             <Input
-                                id="project-description"
+                                id="blueprint-description"
                                 placeholder="Brief description of what you're verifying"
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
@@ -125,7 +125,7 @@ export function CreateProjectModal({
                                     Creating...
                                 </>
                             ) : (
-                                "Create Project"
+                                "Create Blueprint"
                             )}
                         </Button>
                     </DialogFooter>

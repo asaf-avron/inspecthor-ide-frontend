@@ -4,8 +4,8 @@ import React, { createContext, useContext, useReducer, useCallback, ReactNode } 
 import { useRouter } from 'next/navigation';
 import { apiClient } from './api-client';
 import type {
-    ProjectResponse,
-    ProjectStructureResponse,
+    BlueprintResponse,
+    BlueprintStructureResponse,
     LogEntry,
     GenerateSpecResponse,
     Gap,
@@ -20,17 +20,17 @@ import type {
 } from './types';
 
 // === State Types ===
-export type ProjectMode = "local" | "cloud";
+export type BlueprintMode = "local" | "cloud";
 
-export interface ProjectState {
-    // Project mode (local-first vs cloud-synced)
-    mode: ProjectMode;
+export interface BlueprintState {
+    // Blueprint mode (local-first vs cloud-synced)
+    mode: BlueprintMode;
 
-    // Project data
-    projectId: string | null;
-    currentProject: ProjectResponse | null;
-    projectStructure: ProjectStructureResponse | null;
-    hasProject: boolean;
+    // Blueprint data
+    blueprintId: string | null;
+    currentBlueprint: BlueprintResponse | null;
+    blueprintStructure: BlueprintStructureResponse | null;
+    hasBlueprint: boolean;
 
     // Generation results
     generatedSpec: GenerateSpecResponse | null;
@@ -65,11 +65,11 @@ export interface ProjectState {
 }
 
 // === Action Types ===
-type ProjectAction =
-    | { type: 'SET_MODE'; payload: ProjectMode }
-    | { type: 'SET_PROJECT'; payload: { hasProject: boolean; projectId?: string } }
-    | { type: 'SET_CURRENT_PROJECT'; payload: ProjectResponse | null }
-    | { type: 'SET_PROJECT_STRUCTURE'; payload: ProjectStructureResponse | null }
+type BlueprintAction =
+    | { type: 'SET_MODE'; payload: BlueprintMode }
+    | { type: 'SET_BLUEPRINT'; payload: { hasBlueprint: boolean; blueprintId?: string } }
+    | { type: 'SET_CURRENT_BLUEPRINT'; payload: BlueprintResponse | null }
+    | { type: 'SET_BLUEPRINT_STRUCTURE'; payload: BlueprintStructureResponse | null }
     | { type: 'SET_GENERATED_SPEC'; payload: GenerateSpecResponse }
     | { type: 'ADD_CHAT_MESSAGE'; payload: ChatMessage }
     | { type: 'SET_CHAT_HISTORY'; payload: ChatMessage[] }
@@ -87,15 +87,15 @@ type ProjectAction =
     | { type: 'SET_STATISTICS'; payload: SpecStatistics | null }
     | { type: 'SET_TRACEABILITY_MATRIX'; payload: TraceabilityEntry[] }
     | { type: 'SET_REFERENCE_MAPPINGS'; payload: ReferenceMapping[] }
-    | { type: 'RESET_PROJECT' };
+    | { type: 'RESET_BLUEPRINT' };
 
 // === Initial State ===
-const initialState: ProjectState = {
+const initialState: BlueprintState = {
     mode: "local",
-    projectId: null,
-    currentProject: null,
-    projectStructure: null,
-    hasProject: false,
+    blueprintId: null,
+    currentBlueprint: null,
+    blueprintStructure: null,
+    hasBlueprint: false,
     generatedSpec: null,
     traceabilityMatrix: [],
     referenceMappings: [],
@@ -142,30 +142,30 @@ function formatTime(): string {
 }
 
 // === Reducer ===
-function projectReducer(state: ProjectState, action: ProjectAction): ProjectState {
+function blueprintReducer(state: BlueprintState, action: BlueprintAction): BlueprintState {
     switch (action.type) {
         case 'SET_MODE':
             return { ...state, mode: action.payload };
-        case 'SET_PROJECT':
+        case 'SET_BLUEPRINT':
             return {
                 ...state,
-                hasProject: action.payload.hasProject,
-                projectId: action.payload.projectId || null,
+                hasBlueprint: action.payload.hasBlueprint,
+                blueprintId: action.payload.blueprintId || null,
             };
-        case 'SET_CURRENT_PROJECT':
+        case 'SET_CURRENT_BLUEPRINT':
             return {
                 ...state,
-                currentProject: action.payload,
-                projectId: action.payload?.project_id || null,
-                hasProject: action.payload !== null,
+                currentBlueprint: action.payload,
+                blueprintId: action.payload?.blueprint_id || null,
+                hasBlueprint: action.payload !== null,
             };
-        case 'SET_PROJECT_STRUCTURE':
+        case 'SET_BLUEPRINT_STRUCTURE':
             return {
                 ...state,
-                projectStructure: action.payload,
-                currentProject: action.payload?.project || null,
-                projectId: action.payload?.project.project_id || null,
-                hasProject: action.payload !== null,
+                blueprintStructure: action.payload,
+                currentBlueprint: action.payload?.blueprint || null,
+                blueprintId: action.payload?.blueprint.blueprint_id || null,
+                hasBlueprint: action.payload !== null,
             };
         case 'SET_GENERATED_SPEC':
             return {
@@ -213,7 +213,7 @@ function projectReducer(state: ProjectState, action: ProjectAction): ProjectStat
             return { ...state, ambiguities: action.payload };
         case 'SET_STATISTICS':
             return { ...state, statistics: action.payload };
-        case 'RESET_PROJECT':
+        case 'RESET_BLUEPRINT':
             return { ...initialState };
         default:
             return state;
@@ -221,18 +221,18 @@ function projectReducer(state: ProjectState, action: ProjectAction): ProjectStat
 }
 
 // === Context Type ===
-interface ProjectContextType {
-    state: ProjectState;
+interface BlueprintContextType {
+    state: BlueprintState;
     // Mode management
-    setMode: (mode: ProjectMode) => void;
+    setMode: (mode: BlueprintMode) => void;
     // Actions
     checkHealth: () => Promise<void>;
-    createProject: (name: string, description?: string) => Promise<void>;
-    loadProjectFromUrl: (projectId: string, forceRefresh?: boolean) => Promise<void>;
-    switchProject: (newProjectId: string) => Promise<void>;
+    createBlueprint: (name: string, description?: string) => Promise<void>;
+    loadBlueprintFromUrl: (blueprintId: string, forceRefresh?: boolean) => Promise<void>;
+    switchBlueprint: (newBlueprintId: string) => Promise<void>;
     // Generation and refinement
     generateSpec: (englishSpec: string, sourceFileId?: string, currentFilename?: string) => Promise<void>;
-    findGaps: (spec: string, projectId?: string, sourceFileId?: string) => Promise<void>;
+    findGaps: (spec: string, blueprintId?: string, sourceFileId?: string) => Promise<void>;
     refineSpec: (spec: string, gapIds?: string[]) => Promise<void>;
     // Chat
     sendChatMessage: (message: string, context?: ChatContext) => Promise<ChatResponse | null>;
@@ -240,7 +240,7 @@ interface ProjectContextType {
     addLog: (level: LogEntry['level'], message: string) => void;
     clearLogs: () => void;
     // Utilities
-    resetProject: () => void;
+    resetBlueprint: () => void;
     setError: (error: string | null) => void;
     setDeconstructing: (value: boolean) => void;
     deconstructToUnits: (sourceFileId: string) => Promise<void>;
@@ -248,23 +248,23 @@ interface ProjectContextType {
 }
 
 // === Context ===
-const ProjectContext = createContext<ProjectContextType | null>(null);
+const BlueprintContext = createContext<BlueprintContextType | null>(null);
 
 // === Provider ===
-export function ProjectProvider({
+export function BlueprintProvider({
     children,
     initialMode = "local"
 }: {
     children: ReactNode;
-    initialMode?: ProjectMode;
+    initialMode?: BlueprintMode;
 }) {
-    const [state, dispatch] = useReducer(projectReducer, {
+    const [state, dispatch] = useReducer(blueprintReducer, {
         ...initialState,
         mode: initialMode,
     });
     const router = useRouter();
 
-    const setMode = useCallback((mode: ProjectMode) => {
+    const setMode = useCallback((mode: BlueprintMode) => {
         dispatch({ type: 'SET_MODE', payload: mode });
     }, []);
 
@@ -296,30 +296,30 @@ export function ProjectProvider({
         }
     }, [addLog]);
 
-    const createProject = useCallback(async (name: string, description?: string) => {
+    const createBlueprint = useCallback(async (name: string, description?: string) => {
         dispatch({ type: 'SET_LOADING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            addLog('info', `Creating new project: ${name}...`);
+            addLog('info', `Creating new blueprint: ${name}...`);
 
-            // Create project via API (bootstraps README.md)
-            const project = await apiClient.createProject(name, description);
+            // Create blueprint via API (bootstraps README.md)
+            const blueprint = await apiClient.createBlueprint(name, description);
 
-            dispatch({ type: 'SET_CURRENT_PROJECT', payload: project });
+            dispatch({ type: 'SET_CURRENT_BLUEPRINT', payload: blueprint });
 
-            // Load project structure
-            const structure = await apiClient.getProjectStructure(project.project_id);
-            dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
+            // Load blueprint structure
+            const structure = await apiClient.getBlueprintStructure(blueprint.blueprint_id);
+            dispatch({ type: 'SET_BLUEPRINT_STRUCTURE', payload: structure });
 
-            // Navigate to project URL
-            if (project.redirect_url) {
-                router.push(project.redirect_url);
+            // Navigate to blueprint URL
+            if (blueprint.redirect_url) {
+                router.push(blueprint.redirect_url);
             }
 
-            addLog('success', `Project created: ${project.name} (${project.file_count} files)`);
+            addLog('success', `Blueprint created: ${blueprint.name} (${blueprint.file_count} files)`);
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'Failed to create project';
+            const message = error instanceof Error ? error.message : 'Failed to create blueprint';
             dispatch({ type: 'SET_ERROR', payload: message });
             addLog('error', message);
             throw error;
@@ -328,8 +328,8 @@ export function ProjectProvider({
         }
     }, [addLog, router]);
 
-    const loadProjectFromUrl = useCallback(async (projectId: string, forceRefresh: boolean = false) => {
-        if (!forceRefresh && state.projectId === projectId && state.currentProject) {
+    const loadBlueprintFromUrl = useCallback(async (blueprintId: string, forceRefresh: boolean = false) => {
+        if (!forceRefresh && state.blueprintId === blueprintId && state.currentBlueprint) {
             return; // Already loaded
         }
 
@@ -337,10 +337,10 @@ export function ProjectProvider({
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            addLog('info', `Loading project: ${projectId}...`);
+            addLog('info', `Loading blueprint: ${blueprintId}...`);
 
-            const structure = await apiClient.getProjectStructure(projectId);
-            dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
+            const structure = await apiClient.getBlueprintStructure(blueprintId);
+            dispatch({ type: 'SET_BLUEPRINT_STRUCTURE', payload: structure });
 
             // Try to load traceability for the first markdown file
             const mdFile = structure.files.find(f => f.file_type === 'md');
@@ -366,9 +366,9 @@ export function ProjectProvider({
                 }
             }
 
-            addLog('success', `Project loaded: ${structure.project.name} (${structure.files.length} files)`);
+            addLog('success', `Blueprint loaded: ${structure.blueprint.name} (${structure.files.length} files)`);
         } catch (error: any) {
-            const message = error instanceof Error ? error.message : 'Failed to load project';
+            const message = error instanceof Error ? error.message : 'Failed to load blueprint';
             dispatch({ type: 'SET_ERROR', payload: message });
             addLog('error', message);
 
@@ -380,30 +380,30 @@ export function ProjectProvider({
         } finally {
             dispatch({ type: 'SET_LOADING', payload: false });
         }
-    }, [state.projectId, state.currentProject, addLog, router]);
+    }, [state.blueprintId, state.currentBlueprint, addLog, router]);
 
-    const switchProject = useCallback(async (newProjectId: string) => {
-        if (state.projectId === newProjectId) {
-            return; // Already on this project
+    const switchBlueprint = useCallback(async (newBlueprintId: string) => {
+        if (state.blueprintId === newBlueprintId) {
+            return; // Already on this blueprint
         }
 
         // Reset state
-        dispatch({ type: 'RESET_PROJECT' });
+        dispatch({ type: 'RESET_BLUEPRINT' });
 
-        // Navigate to new project
-        router.push(`/app/${newProjectId}`);
+        // Navigate to new blueprint
+        router.push(`/app/${newBlueprintId}`);
 
-        // Load new project
-        await loadProjectFromUrl(newProjectId);
-    }, [state.projectId, router, loadProjectFromUrl]);
+        // Load new blueprint
+        await loadBlueprintFromUrl(newBlueprintId);
+    }, [state.blueprintId, router, loadBlueprintFromUrl]);
 
     const generateSpec = useCallback(async (
         englishSpec: string,
         sourceFileId?: string,
         currentFilename?: string
     ) => {
-        if (!state.projectId) {
-            throw new Error('No project selected');
+        if (!state.blueprintId) {
+            throw new Error('No blueprint selected');
         }
 
         dispatch({ type: 'SET_GENERATING', payload: true });
@@ -417,7 +417,7 @@ export function ProjectProvider({
                 englishSpec,
                 'standard',
                 currentFilename,
-                state.projectId,
+                state.blueprintId,
                 sourceFileId
             );
 
@@ -430,14 +430,14 @@ export function ProjectProvider({
             );
             dispatch({ type: 'SET_REFERENCE_MAPPINGS', payload: mappings });
 
-            // Refresh project structure to show newly created .dfy and unit files
+            // Refresh blueprint structure to show newly created .dfy and unit files
             try {
-                const structure = await apiClient.getProjectStructure(state.projectId);
-                dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
-                addLog('debug', 'Project structure refreshed');
+                const structure = await apiClient.getBlueprintStructure(state.blueprintId);
+                dispatch({ type: 'SET_BLUEPRINT_STRUCTURE', payload: structure });
+                addLog('debug', 'Blueprint structure refreshed');
             } catch (refreshError) {
                 // Don't fail the whole operation if refresh fails
-                addLog('warn', 'Failed to refresh project structure');
+                addLog('warn', 'Failed to refresh blueprint structure');
             }
 
             addLog('success', `Triage: ${response.triage.doc_type} (${(response.triage.confidence * 100).toFixed(0)}% confidence)`);
@@ -449,9 +449,9 @@ export function ProjectProvider({
         } finally {
             dispatch({ type: 'SET_GENERATING', payload: false });
         }
-    }, [addLog, state.projectId]);
+    }, [addLog, state.blueprintId]);
 
-    const findGaps = useCallback(async (spec: string, projectId?: string, sourceFileId?: string) => {
+    const findGaps = useCallback(async (spec: string, blueprintId?: string, sourceFileId?: string) => {
         dispatch({ type: 'SET_REFINING', payload: true });
         dispatch({ type: 'SET_ERROR', payload: null });
 
@@ -460,7 +460,7 @@ export function ProjectProvider({
 
             const response = await apiClient.findGaps({
                 spec,
-                project_id: projectId,
+                blueprint_id: blueprintId,
                 source_file_id: sourceFileId,
             });
 
@@ -531,8 +531,8 @@ export function ProjectProvider({
         dispatch({ type: 'CLEAR_LOGS' });
     }, []);
 
-    const resetProject = useCallback(() => {
-        dispatch({ type: 'RESET_PROJECT' });
+    const resetBlueprint = useCallback(() => {
+        dispatch({ type: 'RESET_BLUEPRINT' });
     }, []);
 
     const setError = useCallback((error: string | null) => {
@@ -559,14 +559,14 @@ export function ProjectProvider({
         dispatch({ type: 'SET_ERROR', payload: null });
 
         try {
-            if (!state.projectId) {
-                throw new Error('No project selected');
+            if (!state.blueprintId) {
+                throw new Error('No blueprint selected');
             }
 
             addLog('info', 'Starting specification deconstruction...');
 
             const response = await apiClient.deconstructSpec({
-                project_id: state.projectId,
+                blueprint_id: state.blueprintId,
                 source_file_id: sourceFileId,
                 strategy: 'auto'
             });
@@ -584,9 +584,9 @@ export function ProjectProvider({
 
             addLog('info', `Created ${response.statistics.total_files_created} files in ${response.statistics.processing_time_seconds}s`);
 
-            // Reload project structure to show new units
-            const structure = await apiClient.getProjectStructure(state.projectId);
-            dispatch({ type: 'SET_PROJECT_STRUCTURE', payload: structure });
+            // Reload blueprint structure to show new units
+            const structure = await apiClient.getBlueprintStructure(state.blueprintId);
+            dispatch({ type: 'SET_BLUEPRINT_STRUCTURE', payload: structure });
 
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Deconstruction failed';
@@ -595,22 +595,22 @@ export function ProjectProvider({
         } finally {
             dispatch({ type: 'SET_DECONSTRUCTING', payload: false });
         }
-    }, [state.projectId, addLog]);
+    }, [state.blueprintId, addLog]);
 
-    const contextValue: ProjectContextType = {
+    const contextValue: BlueprintContextType = {
         state,
         setMode,
         checkHealth,
-        createProject,
-        loadProjectFromUrl,
-        switchProject,
+        createBlueprint,
+        loadBlueprintFromUrl,
+        switchBlueprint,
         generateSpec,
         findGaps,
         refineSpec,
         sendChatMessage,
         addLog,
         clearLogs,
-        resetProject,
+        resetBlueprint,
         setError,
         setDeconstructing,
         deconstructToUnits,
@@ -618,19 +618,19 @@ export function ProjectProvider({
     };
 
     return (
-        <ProjectContext.Provider value={contextValue}>
+        <BlueprintContext.Provider value={contextValue}>
             {children}
-        </ProjectContext.Provider>
+        </BlueprintContext.Provider>
     );
 }
 
 // === Hook ===
-export function useProject(): ProjectContextType {
-    const context = useContext(ProjectContext);
+export function useBlueprint(): BlueprintContextType {
+    const context = useContext(BlueprintContext);
     if (!context) {
-        throw new Error('useProject must be used within a ProjectProvider');
+        throw new Error('useBlueprint must be used within a BlueprintProvider');
     }
     return context;
 }
 
-export default ProjectContext;
+export default BlueprintContext;

@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { useAutoSave } from "@/lib/hooks/useAutoSave";
 import { SaveStatusIndicator } from "./save-status-indicator";
@@ -25,14 +25,14 @@ interface MarkdownEditorProps {
 }
 
 // Unit Link Badge Component
-function UnitLinkBadge({ 
-  title, 
-  lineNumber, 
-  onClick 
-}: { 
-  title: string; 
-  lineNumber: number; 
-  onClick: () => void 
+function UnitLinkBadge({
+  title,
+  lineNumber,
+  onClick
+}: {
+  title: string;
+  lineNumber: number;
+  onClick: () => void
 }) {
   return (
     <TooltipProvider>
@@ -168,20 +168,20 @@ function renderMarkdown(content: string): React.ReactNode {
   return elements;
 }
 
-export function MarkdownEditor({ 
-  onGenerateSpec, 
+export function MarkdownEditor({
+  onGenerateSpec,
   isGenerating,
   isRootFile = false,  // Default to false - only true if file has units
 }: MarkdownEditorProps) {
-  const { state: projectState, findGaps, refineSpec } = useProject();
+  const { state: blueprintState, findGaps, refineSpec } = useBlueprint();
   const { state: fileState, updateFileContent, forceSaveCurrentFile, selectFile } = useFileContext();
   const [isEditing, setIsEditing] = useState(true);
   const [traceabilityLinks, setTraceabilityLinks] = useState<TraceabilityLink[]>([]);
   const [showRefinementView, setShowRefinementView] = useState(false);
-  
+
   // Get current file content from activeFile
   const currentContent = fileState.activeFile?.content ?? '';
-  
+
   // Auto-save hook
   const autoSave = useAutoSave({
     fileId: fileState.activeFile?.id || null,
@@ -215,7 +215,7 @@ export function MarkdownEditor({
         setTraceabilityLinks([]);
       }
     };
-    
+
     fetchTraceability();
   }, [isRootFile, fileState.activeFile?.id]);
 
@@ -260,8 +260,8 @@ export function MarkdownEditor({
             <FileText className="h-3.5 w-3.5 text-info" />
             <span>{filename}</span>
             {fileState.activeFile && (
-              <SaveStatusIndicator 
-                status={autoSave.status} 
+              <SaveStatusIndicator
+                status={autoSave.status}
                 onRetry={autoSave.retrySave}
               />
             )}
@@ -271,7 +271,7 @@ export function MarkdownEditor({
               </span>
             )}
           </div>
-          
+
           {/* Edit/Preview Toggle */}
           <div className="flex items-center gap-1 px-2">
             <button
@@ -296,7 +296,7 @@ export function MarkdownEditor({
             </button>
           </div>
         </div>
-        
+
         {/* Generate Button */}
         <div className="flex items-center gap-2 pr-2">
           {fileState.activeFile && autoSave.status !== 'clean' && (
@@ -316,33 +316,33 @@ export function MarkdownEditor({
                 <Button
                   onClick={async () => {
                     // Find gaps if not already found
-                    if (projectState.gaps.length === 0 && fileState.activeFile?.id) {
+                    if (blueprintState.gaps.length === 0 && fileState.activeFile?.id) {
                       try {
-                        await findGaps(displayContent, projectState.projectId || undefined, fileState.activeFile.id);
+                        await findGaps(displayContent, blueprintState.blueprintId || undefined, fileState.activeFile.id);
                       } catch (error) {
                         console.error("Failed to find gaps:", error);
                       }
                     }
                     setShowRefinementView(true);
                   }}
-                  disabled={projectState.isRefining || !displayContent.trim()}
+                  disabled={blueprintState.isRefining || !displayContent.trim()}
                   size="sm"
                   variant="outline"
                   className="h-7 gap-1.5 px-3 text-xs"
                 >
-                  <Edit3 className={`h-3.5 w-3.5 ${projectState.isRefining ? "animate-pulse" : ""}`} />
-                  <span>{projectState.isRefining ? "Refining..." : "Refine Spec"}</span>
-                  {projectState.gaps.length > 0 && (
+                  <Edit3 className={`h-3.5 w-3.5 ${blueprintState.isRefining ? "animate-pulse" : ""}`} />
+                  <span>{blueprintState.isRefining ? "Refining..." : "Refine Spec"}</span>
+                  {blueprintState.gaps.length > 0 && (
                     <span className="ml-1 rounded bg-warning/20 px-1 py-0.5 text-[10px] font-medium text-warning">
-                      {projectState.gaps.length}
+                      {blueprintState.gaps.length}
                     </span>
                   )}
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
                 <p>
-                  {projectState.gaps.length > 0 
-                    ? `Review and apply ${projectState.gaps.length} gap suggestion${projectState.gaps.length > 1 ? 's' : ''} before generating formal spec`
+                  {blueprintState.gaps.length > 0
+                    ? `Review and apply ${blueprintState.gaps.length} gap suggestion${blueprintState.gaps.length > 1 ? 's' : ''} before generating formal spec`
                     : "Find and fix gaps in your specification"}
                 </p>
               </TooltipContent>
@@ -391,7 +391,7 @@ export function MarkdownEditor({
       {/* Toolbar (only in edit mode) */}
       {isEditing && (
         <div className="flex h-8 items-center gap-1 border-b border-border bg-secondary/10 px-3">
-          <button 
+          <button
             className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
             onClick={() => {
               const textarea = document.querySelector('textarea') as HTMLTextAreaElement;

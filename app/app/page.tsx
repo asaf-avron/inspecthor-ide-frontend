@@ -1,17 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Header, ViewMode } from "@/components/ide/header";
-import { ProjectExplorer } from "@/components/ide/project-explorer";
-import { ProjectsDashboard } from "@/components/ide/projects-dashboard";
+import { BlueprintExplorer } from "@/components/ide/blueprint-explorer";
+import { BlueprintsDashboard } from "@/components/ide/blueprints-dashboard";
 import { TerminalPanel } from "@/components/ide/terminal-panel";
-import { useState, useCallback } from "react";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 
 export default function IDEHomePage() {
   const router = useRouter();
-  const { state, checkHealth, resetProject } = useProject();
+  const { state, checkHealth, resetBlueprint } = useBlueprint();
   const [isTerminalCollapsed, setIsTerminalCollapsed] = useState(true);
   const [isExplorerCollapsed, setIsExplorerCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
@@ -20,16 +19,16 @@ export default function IDEHomePage() {
     checkHealth();
   }, [checkHealth]);
 
-  // Clear project state when navigating to dashboard (only on mount)
+  // Clear blueprint state when navigating to dashboard (only on mount)
   useEffect(() => {
-    resetProject();
-  }, [resetProject]);
+    resetBlueprint();
+  }, [resetBlueprint]);
 
   const handleViewModeChange = useCallback((mode: ViewMode) => {
     setViewMode(mode);
   }, []);
 
-  // Show loading if checking for existing project
+  // Show loading if checking for existing blueprint
   if (state.isLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -44,28 +43,28 @@ export default function IDEHomePage() {
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       {/* Header */}
-      <Header 
-        onRunVerification={() => {}}
+      <Header
+        onRunVerification={() => { }}
         isVerifying={false}
         showVerification={false}
-        hasProject={false}
+        hasBlueprint={false}
         viewMode={viewMode}
         onViewModeChange={handleViewModeChange}
       />
 
       {/* Main Content */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Project Explorer Sidebar */}
-        <ProjectExplorer
+        {/* Blueprint Explorer Sidebar */}
+        <BlueprintExplorer
           selectedFile=""
-          onFileSelect={() => {}}
+          onFileSelect={() => { }}
           isCollapsed={isExplorerCollapsed}
           onToggleCollapse={() => setIsExplorerCollapsed(!isExplorerCollapsed)}
-          hasProject={false}
+          hasBlueprint={false}
         />
 
-        {/* Projects Dashboard */}
-        <ProjectsDashboard />
+        {/* Blueprints Dashboard */}
+        <BlueprintsDashboard />
       </div>
 
       {/* Bottom Panel - Terminal */}

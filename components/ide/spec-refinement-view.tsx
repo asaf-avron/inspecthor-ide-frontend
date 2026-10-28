@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { X, Check, CheckSquare, Square, Eye, FileText, ArrowRight, RefreshCw, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { useProject } from "@/lib/project-context";
+import { useBlueprint } from "@/lib/blueprint-context";
 import { useFileContext } from "@/lib/contexts/file-context";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -18,16 +18,16 @@ interface SpecRefinementViewProps {
   onClose: () => void;
 }
 
-function DiffView({ 
-  original, 
-  refined, 
+function DiffView({
+  original,
+  refined,
   viewMode,
   isOriginal,
   selectedGapIds,
   gaps
-}: { 
-  original: string; 
-  refined: string; 
+}: {
+  original: string;
+  refined: string;
   viewMode: ViewMode;
   isOriginal?: boolean;
   selectedGapIds?: Set<string>;
@@ -72,7 +72,7 @@ function DiffView({
   // Text mode with diff highlighting
   let lineNumber = 1;
   const lines = content.split('\n');
-  
+
   return (
     <div className="h-full overflow-auto font-mono text-sm">
       <div className="min-w-full">
@@ -81,7 +81,7 @@ function DiffView({
           let bgColor = "bg-transparent";
           let borderColor = "";
           let isHighlighted = highlightedLines.has(lineNumber);
-          
+
           if (!isOriginal) {
             // For refined view, check if line was added
             const diffIndex = diff.findIndex((part: Change) => {
@@ -112,12 +112,12 @@ function DiffView({
 
           // Add highlight for selected gaps
           if (isHighlighted) {
-            bgColor = isOriginal 
-              ? "bg-yellow-500/30 dark:bg-yellow-500/20" 
+            bgColor = isOriginal
+              ? "bg-yellow-500/30 dark:bg-yellow-500/20"
               : "bg-blue-500/30 dark:bg-blue-500/20";
             if (!borderColor) {
-              borderColor = isOriginal 
-                ? "border-l-2 border-yellow-500" 
+              borderColor = isOriginal
+                ? "border-l-2 border-yellow-500"
                 : "border-l-2 border-blue-500";
             }
           }
@@ -145,7 +145,7 @@ function DiffView({
 }
 
 export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
-  const { state: projectState, refineSpec } = useProject();
+  const { state: blueprintState, refineSpec } = useBlueprint();
   const { state: fileState, updateFile } = useFileContext();
   const [selectedGapIds, setSelectedGapIds] = useState<Set<string>>(new Set());
   const [appliedGapIds, setAppliedGapIds] = useState<Set<string>>(new Set()); // Track applied gaps for rollback
@@ -156,11 +156,11 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
 
   // Get markdown content from active file
   const originalSpec = fileState.activeFile?.fileType === 'md' ? fileState.activeFile.content : "";
-  const refinedSpec = projectState.refinedSpec || originalSpec;
+  const refinedSpec = blueprintState.refinedSpec || originalSpec;
 
   // Initialize refinement when dialog opens
   useEffect(() => {
-    if (open && projectState.gaps.length > 0 && !projectState.refinedSpec && originalSpec) {
+    if (open && blueprintState.gaps.length > 0 && !blueprintState.refinedSpec && originalSpec) {
       // Auto-refine with all gaps when dialog opens
       refineSpec(originalSpec).catch((error) => {
         console.error("Failed to initialize refinement:", error);
@@ -178,7 +178,7 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
   const handleToggleGap = useCallback((gapId: string) => {
     // Don't allow toggling applied gaps
     if (appliedGapIds.has(gapId)) return;
-    
+
     setSelectedGapIds((prev) => {
       const next = new Set(prev);
       if (next.has(gapId)) {
@@ -191,11 +191,11 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
   }, [appliedGapIds]);
 
   const handleSelectAll = useCallback(() => {
-    const unappliedGaps = projectState.gaps
+    const unappliedGaps = blueprintState.gaps
       .filter(g => !appliedGapIds.has(g.id))
       .map(g => g.id);
     setSelectedGapIds(new Set(unappliedGaps));
-  }, [projectState.gaps, appliedGapIds]);
+  }, [blueprintState.gaps, appliedGapIds]);
 
   const handleDeselectAll = useCallback(() => {
     setSelectedGapIds(new Set());
@@ -203,15 +203,15 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
 
   const handleApplySelected = useCallback(async () => {
     if (selectedGapIds.size === 0) return;
-    
+
     setIsApplying(true);
     try {
       // Save current state for rollback
       setPreviousRefinedSpec(refinedSpec);
       setLastAppliedGapIds(new Set(selectedGapIds));
-      
+
       await refineSpec(originalSpec, Array.from(selectedGapIds));
-      
+
       // Mark gaps as applied and clear selection
       setAppliedGapIds(prev => {
         const next = new Set(prev);
@@ -231,11 +231,11 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
     try {
       // Save current state for rollback
       setPreviousRefinedSpec(refinedSpec);
-      const allGapIds = new Set(projectState.gaps.map(g => g.id));
+      const allGapIds = new Set(blueprintState.gaps.map(g => g.id));
       setLastAppliedGapIds(allGapIds);
-      
+
       await refineSpec(originalSpec);
-      
+
       // Mark all gaps as applied
       setAppliedGapIds(allGapIds);
       setSelectedGapIds(new Set());
@@ -244,18 +244,18 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
     } finally {
       setIsApplying(false);
     }
-  }, [refineSpec, refinedSpec, projectState.gaps, originalSpec]);
+  }, [refineSpec, refinedSpec, blueprintState.gaps, originalSpec]);
 
   const handleRollback = useCallback(async () => {
     if (!previousRefinedSpec || lastAppliedGapIds.size === 0) return;
-    
+
     setIsApplying(true);
     try {
       // Restore previous refined spec by calling refineSpec with remaining gaps
-      const remainingGaps = projectState.gaps
+      const remainingGaps = blueprintState.gaps
         .filter(g => !lastAppliedGapIds.has(g.id))
         .map(g => g.id);
-      
+
       if (remainingGaps.length > 0) {
         await refineSpec(originalSpec, remainingGaps);
       } else {
@@ -263,7 +263,7 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
         // Call refineSpec with empty array to get original (no gaps applied)
         await refineSpec(originalSpec, []);
       }
-      
+
       // Remove the last applied gaps from applied set
       setAppliedGapIds(prev => {
         const next = new Set(prev);
@@ -277,20 +277,20 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
     } finally {
       setIsApplying(false);
     }
-  }, [previousRefinedSpec, lastAppliedGapIds, refineSpec, projectState.gaps, originalSpec]);
+  }, [previousRefinedSpec, lastAppliedGapIds, refineSpec, blueprintState.gaps, originalSpec]);
 
   const handleAcceptRefinement = useCallback(async () => {
-    if (!fileState.activeFile || !projectState.refinedSpec) {
+    if (!fileState.activeFile || !blueprintState.refinedSpec) {
       return;
     }
     try {
       // Update the file with refined content
-      await updateFile(fileState.activeFile.id, projectState.refinedSpec);
+      await updateFile(fileState.activeFile.id, blueprintState.refinedSpec);
       onClose();
     } catch (error) {
       console.error("Failed to apply refinement:", error);
     }
-  }, [fileState.activeFile, projectState.refinedSpec, updateFile, onClose]);
+  }, [fileState.activeFile, blueprintState.refinedSpec, updateFile, onClose]);
 
   const handleRegenerate = useCallback(async () => {
     setIsApplying(true);
@@ -303,7 +303,7 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
     }
   }, [selectedGapIds, refineSpec, originalSpec]);
 
-  if (projectState.gaps.length === 0) {
+  if (blueprintState.gaps.length === 0) {
     return null;
   }
 
@@ -319,7 +319,7 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
           <div className="w-80 border-r flex flex-col">
             <div className="p-4 border-b">
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-medium">Gaps ({projectState.gaps.length})</h3>
+                <h3 className="text-sm font-medium">Gaps ({blueprintState.gaps.length})</h3>
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
@@ -373,7 +373,7 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
             </div>
 
             <div className="flex-1 overflow-auto p-4 space-y-2">
-              {projectState.gaps.map((gap) => {
+              {blueprintState.gaps.map((gap) => {
                 const isSelected = selectedGapIds.has(gap.id);
                 const isApplied = appliedGapIds.has(gap.id);
                 return (
@@ -381,14 +381,14 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
                     key={gap.id}
                     className={cn(
                       "rounded-lg border p-3 text-sm transition-colors",
-                      isApplied 
+                      isApplied
                         ? "border-green-500/50 bg-green-500/10 cursor-default opacity-75"
                         : "cursor-pointer",
                       isSelected && !isApplied
                         ? "border-primary bg-primary/10"
                         : !isApplied && gap.severity === "critical"
-                        ? "border-destructive/50 bg-destructive/10"
-                        : !isApplied && "border-warning/50 bg-warning/10"
+                          ? "border-destructive/50 bg-destructive/10"
+                          : !isApplied && "border-warning/50 bg-warning/10"
                     )}
                     onClick={() => !isApplied && handleToggleGap(gap.id)}
                   >
@@ -463,9 +463,9 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
                 size="sm"
                 className="h-7 gap-1.5 px-3 text-xs"
                 onClick={handleRegenerate}
-                disabled={isApplying || projectState.isRefining}
+                disabled={isApplying || blueprintState.isRefining}
               >
-                <RefreshCw className={cn("h-3.5 w-3.5", (isApplying || projectState.isRefining) && "animate-spin")} />
+                <RefreshCw className={cn("h-3.5 w-3.5", (isApplying || blueprintState.isRefining) && "animate-spin")} />
                 Regenerate
               </Button>
             </div>
@@ -477,13 +477,13 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
                 <div className="px-4 py-2 border-b bg-secondary/30">
                   <span className="text-xs font-medium text-muted-foreground">Original</span>
                 </div>
-                <DiffView 
-                  original={originalSpec} 
-                  refined={refinedSpec} 
-                  viewMode={viewMode} 
+                <DiffView
+                  original={originalSpec}
+                  refined={refinedSpec}
+                  viewMode={viewMode}
                   isOriginal={true}
                   selectedGapIds={selectedGapIds}
-                  gaps={projectState.gaps}
+                  gaps={blueprintState.gaps}
                 />
               </div>
 
@@ -492,13 +492,13 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
                 <div className="px-4 py-2 border-b bg-secondary/30">
                   <span className="text-xs font-medium text-muted-foreground">Refined</span>
                 </div>
-                <DiffView 
-                  original={originalSpec} 
-                  refined={refinedSpec} 
-                  viewMode={viewMode} 
+                <DiffView
+                  original={originalSpec}
+                  refined={refinedSpec}
+                  viewMode={viewMode}
                   isOriginal={false}
                   selectedGapIds={selectedGapIds}
-                  gaps={projectState.gaps}
+                  gaps={blueprintState.gaps}
                 />
               </div>
             </div>
@@ -515,15 +515,15 @@ export function SpecRefinementView({ open, onClose }: SpecRefinementViewProps) {
               variant="outline"
               size="sm"
               onClick={handleRegenerate}
-              disabled={isApplying || projectState.isRefining}
+              disabled={isApplying || blueprintState.isRefining}
             >
-              <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", (isApplying || projectState.isRefining) && "animate-spin")} />
+              <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", (isApplying || blueprintState.isRefining) && "animate-spin")} />
               Regenerate Refinement
             </Button>
             <Button
               size="sm"
               onClick={handleAcceptRefinement}
-              disabled={!projectState.refinedSpec || projectState.refinedSpec === originalSpec}
+              disabled={!blueprintState.refinedSpec || blueprintState.refinedSpec === originalSpec}
               className="gap-1.5"
             >
               <Check className="h-3.5 w-3.5" />

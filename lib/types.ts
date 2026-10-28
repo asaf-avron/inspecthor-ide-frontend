@@ -53,22 +53,19 @@ export interface SpecStatistics {
 export type BlueprintDomain = "banking" | "healthcare" | "authentication" | "custom";
 
 export interface BlueprintInitRequest {
-    name: string;
-    repository_url: string;
+    owner: string;
+    repo_name: string;
     installation_id: number;
-    domain?: BlueprintDomain;
-    force?: boolean;
+    blueprint_name: string;
+    description?: string;
 }
 
 export interface BlueprintInitResponse {
-    blueprint_id: string;
-    name: string;
-    repository_url: string;
+    blueprint: BlueprintResponse;
+    github_url: string;
     commit_sha: string;
-    commit_url: string;
     files_created: string[];
-    default_branch: string;
-    next_steps: string[];
+    setup_status: "success" | "partial" | "failed";
 }
 
 export interface GenerateSpecOptions {
@@ -82,7 +79,7 @@ export interface GenerateSpecRequest {
     rigor_level?: RigorLevel;
     options?: GenerateSpecOptions;
     current_filename?: string;
-    project_id?: string;
+    blueprint_id?: string;
     source_file_id?: string;
 }
 
@@ -186,7 +183,7 @@ export interface FileSaveRequest {
     filename: string;
     content: string;
     file_type: FileType;
-    project_id: string;  // Required - files must belong to a project
+    blueprint_id: string;  // Required - files must belong to a blueprint
 }
 
 export interface FileUpdateRequest {
@@ -206,7 +203,7 @@ export interface FileResponse {
     filename: string;
     content: string;
     file_type: string;
-    project_id: string;
+    blueprint_id: string;
     created_at: string;
     updated_at: string;
     size_bytes: number;
@@ -232,45 +229,49 @@ export interface FileDeleteResponse {
     file_id: string;
 }
 
-// === Project Management Types ===
-export interface Project {
-    project_id: string;
+// === Blueprint Management Types ===
+export interface Blueprint {
+    blueprint_id: string;
     name: string;
     description: string | null;
     created_at: string;
     updated_at: string;
     file_count: number;
+    repository_url?: string;
+    default_branch?: string;
 }
 
-export interface ProjectCreateRequest {
+export interface BlueprintCreateRequest {
     name: string;
     description?: string;
 }
 
-export interface ProjectUpdateRequest {
+export interface BlueprintUpdateRequest {
     name?: string;
     description?: string;
 }
 
-export interface ProjectResponse {
-    project_id: string;
+export interface BlueprintResponse {
+    blueprint_id: string;
     name: string;
     description: string | null;
     created_at: string;
     updated_at: string;
     file_count: number;
     redirect_url?: string;
+    repository_url?: string;
+    default_branch?: string;
 }
 
-export interface ProjectListParams {
+export interface BlueprintListParams {
     limit?: number;
     offset?: number;
     sort?: "created_at" | "updated_at" | "name";
     order?: "asc" | "desc";
 }
 
-export interface ProjectListResponse {
-    projects: ProjectResponse[];
+export interface BlueprintListResponse {
+    blueprints: BlueprintResponse[];
     total: number;
     limit: number;
     offset: number;
@@ -284,14 +285,14 @@ export interface FileMetadata {
     size_bytes: number;
 }
 
-export interface ProjectStructureResponse {
-    project: ProjectResponse;
+export interface BlueprintStructureResponse {
+    blueprint: BlueprintResponse;
     files: FileMetadata[];
 }
 
-export interface ProjectDeleteResponse {
+export interface BlueprintDeleteResponse {
     deleted: boolean;
-    project_id: string;
+    blueprint_id: string;
     files_deleted: number;
 }
 
@@ -335,7 +336,7 @@ export interface SuggestResponse {
 // === Spec Refinement Types ===
 export interface FindGapsRequest {
     spec: string;
-    project_id?: string;
+    blueprint_id?: string;
     source_file_id?: string;
 }
 
@@ -363,17 +364,17 @@ export interface HealthResponse {
     dafny_available: boolean;
 }
 
-// === Project Explorer Types (Frontend-specific) ===
-export type ProjectFileType = "md" | "dfy" | "folder" | "unit";
-export type ProjectVerificationStatus = "verified" | "failed" | "pending" | "none";
+// === Blueprint Explorer Types (Frontend-specific) ===
+export type BlueprintFileType = "md" | "dfy" | "folder" | "unit";
+export type BlueprintVerificationStatus = "verified" | "failed" | "pending" | "none";
 
-export interface ProjectFileItem {
+export interface BlueprintFileItem {
     id: string;
     name: string;
-    type: ProjectFileType;
+    type: BlueprintFileType;
     linkedDfy?: string;
-    verificationStatus?: ProjectVerificationStatus;
-    children?: ProjectFileItem[];
+    verificationStatus?: BlueprintVerificationStatus;
+    children?: BlueprintFileItem[];
     // API fields
     file_id?: string;
     content?: string;
@@ -431,7 +432,7 @@ export interface DeconstructStats {
 }
 
 export interface DeconstructRequest {
-    project_id: string;
+    blueprint_id: string;
     source_file_id: string;
     strategy?: "auto" | "manual";
     max_units?: number;
@@ -472,7 +473,7 @@ export interface ActiveFileState {
     lastSavedAt: Date | null;
     filename: string;
     fileType: FileType;
-    projectId: string;
+    blueprintId: string;
 }
 
 export interface FileCache {
@@ -481,4 +482,193 @@ export interface FileCache {
         timestamp: number;
         fileType: string;
     }
+}
+
+// === Proof Ledger Types ===
+export type LedgerVerificationStatus = "verified" | "failed" | "timeout" | "error";
+
+export interface LedgerEntry {
+    entry_id: string;
+    component_uuid: string;
+    timestamp: string;
+    dafny_content_hash: string;
+    verification_status: LedgerVerificationStatus;
+    proof_obligations_proven: number;
+    proof_obligations_total: number;
+    dafny_version: string;
+    signature: string;
+    previous_hash: string | null;
+    entry_number: number;
+}
+
+export interface LedgerHistoryResponse {
+    component_uuid: string;
+    entries: LedgerEntry[];
+    total_entries: number;
+}
+
+export interface ChainIntegrityResponse {
+    component_uuid: string;
+    chain_valid: boolean;
+    total_entries: number;
+    broken_links: number[];
+    errors: string[];
+}
+
+export interface LatestEntryResponse {
+    component_uuid: string;
+    entry: LedgerEntry | null;
+    has_history: boolean;
+}
+
+export interface CodeComparisonResponse {
+    uuid: string;
+    entry_id: string;
+    verified_hash: string;
+    current_hash: string;
+    hash_match: boolean;
+    verified_code: string;
+    current_code: string;
+    diff: {
+        added_lines: number[];
+        removed_lines: number[];
+        modified_lines: number[];
+    };
+    changes_summary: string[];
+}
+
+// === Drift Detection Types ===
+export type DriftIssueType = "moved" | "corrupted" | "missing" | "orphaned";
+export type DriftRepairAction = "update_registry" | "regenerate" | "register" | "delete";
+
+export interface DriftIssue {
+    uuid: string;
+    component_name: string;
+    issue_type: DriftIssueType;
+    expected_path: string | null;
+    found_path: string | null;
+    description: string;
+    severity: "critical" | "high" | "medium" | "low";
+    can_auto_repair: boolean;
+    suggested_action: DriftRepairAction;
+}
+
+export interface DriftScanResponse {
+    success: boolean;
+    repo_path: string;
+    scan_timestamp: string;
+    total_components: number;
+    issues: DriftIssue[];
+    health_score: number;
+}
+
+export interface DriftRepairRequest {
+    uuid: string;
+    action: DriftRepairAction;
+    new_path?: string;
+}
+
+export interface DriftRepairResponse {
+    success: boolean;
+    uuid: string;
+    action: DriftRepairAction;
+    message: string;
+}
+
+export interface DriftAutoRepairResponse {
+    success: boolean;
+    repaired_count: number;
+    failed_count: number;
+    repaired_components: string[];
+    failed_components: string[];
+    errors: string[];
+}
+
+export interface DriftHealthResponse {
+    repo_path: string;
+    health_score: number;
+    total_components: number;
+    healthy_components: number;
+    issues_count: number;
+    last_scan: string | null;
+}
+
+// === Diagram Generation Types ===
+export type DiagramSourceType = "spec" | "code";
+export type DiagramFormat = "mermaid" | "plantuml";
+
+export interface GenerateDiagramRequest {
+    source_type: DiagramSourceType;
+    source_content: string;
+    format?: DiagramFormat;
+}
+
+export interface GenerateDiagramResponse {
+    success: boolean;
+    diagram_code: string;
+    format: DiagramFormat;
+    nodes_count: number;
+    edges_count: number;
+}
+
+export interface CompareDiagramsRequest {
+    expected_diagram: string;
+    actual_diagram: string;
+}
+
+export interface DiagramDifference {
+    type: "missing_node" | "extra_node" | "missing_edge" | "extra_edge" | "modified_node";
+    description: string;
+    severity: "critical" | "high" | "medium" | "low";
+}
+
+export interface CompareDiagramsResponse {
+    similarity_score: number;
+    differences: DiagramDifference[];
+    matching_nodes: string[];
+    matching_edges: string[];
+    missing_nodes: string[];
+    extra_nodes: string[];
+    missing_edges: string[];
+    extra_edges: string[];
+}
+
+// === Harmonization Types ===
+export type SyncStatus = "synchronized" | "desynchronized" | "verifying" | "error";
+export type HarmonizationStrategy = "incremental" | "full" | "manual";
+
+export interface HarmonizationStatusResponse {
+    blueprint_id: string;
+    status: SyncStatus;
+    last_sync: string | null;
+    spec_modified: string | null;
+    dafny_modified: string | null;
+    needs_harmonization: boolean;
+    verification_passing: boolean;
+}
+
+export interface SpecDiffResponse {
+    blueprint_id: string;
+    has_changes: boolean;
+    added_requirements: string[];
+    removed_requirements: string[];
+    modified_requirements: string[];
+    diff_summary: string;
+}
+
+export interface HarmonizeRequest {
+    blueprint_id: string;
+    strategy: HarmonizationStrategy;
+    force?: boolean;
+}
+
+export interface HarmonizeResponse {
+    success: boolean;
+    status: SyncStatus;
+    steps_completed: string[];
+    verification_result?: {
+        passed: boolean;
+        errors: string[];
+    };
+    message: string;
 }
