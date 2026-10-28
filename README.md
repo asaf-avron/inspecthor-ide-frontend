@@ -25,9 +25,23 @@ The IDE is where people do the work that should stay human: stating the intent, 
 | **Verification panel** | Proof obligations and pass or fail results from the Dafny + Z3 verifier | [`verification-panel.tsx`](components/ide/verification-panel.tsx) |
 | **Gemini insight panel** | An assistant that explains failed proofs and suggests fixes | [`gemini-insight-panel.tsx`](components/ide/gemini-insight-panel.tsx) |
 | **Traceability view** | Links each requirement to its contract clause and its proof | [`traceability-view.tsx`](components/ide/traceability-view.tsx) |
-| **Project explorer and terminal** | Files, projects and generation logs | [`project-explorer.tsx`](components/ide/project-explorer.tsx), [`terminal-panel.tsx`](components/ide/terminal-panel.tsx) |
+| **Blueprint explorer and dashboard** | Browse blueprints and their files | [`blueprint-explorer.tsx`](components/ide/blueprint-explorer.tsx), [`blueprints-dashboard.tsx`](components/ide/blueprints-dashboard.tsx) |
+| **Terminal** | Generation and verification logs | [`terminal-panel.tsx`](components/ide/terminal-panel.tsx) |
 | **Blueprint setup** | Start from an Architect's Canvas template instead of a blank page | [`init-modal.tsx`](components/blueprint/init-modal.tsx) |
 | **GitHub** | Sign in, pick a repository, and open a pull request | [`components/github/`](components/github/) |
+
+### Built, but not connected to the backend yet
+
+These components are in the repository but are off by default, because the API routes they call don't match the backend's yet. Tracking this is on the backend [roadmap](https://github.com/asaf-avron/inspecthor-ide-backend#roadmap).
+
+| Component | What it will do | Where |
+|-----------|-----------------|-------|
+| **Proof Ledger** tab | Verification history with chain integrity and tamper alerts | [`components/brain/`](components/brain/) |
+| **Component Health** tab | Drift detection and repair for components | [`components/brain/`](components/brain/) |
+| **Harmonization** | Sync status badge, harmonize button and progress modal | [`harmonize-button.tsx`](components/ide/harmonize-button.tsx), [`sync-status-badge.tsx`](components/ide/sync-status-badge.tsx) |
+| **Mermaid diagrams** | Expected and actual flow diagrams with a comparison view | [`components/visualization/`](components/visualization/) |
+
+To show the two tabs while developing, set `NEXT_PUBLIC_ENABLE_BRAIN_UI=true`. Component Health also needs `NEXT_PUBLIC_LOCAL_REPO_PATH`, the path of a checkout on the machine that runs the backend.
 
 ## Quickstart
 
@@ -49,6 +63,10 @@ Create `.env.local`:
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_INSPECTHOR_API_KEY=<one of ALLOWED_API_KEYS from the backend .env>
+
+# Optional, off by default (see the section above)
+# NEXT_PUBLIC_ENABLE_BRAIN_UI=true
+# NEXT_PUBLIC_LOCAL_REPO_PATH=/path/to/a/checkout
 ```
 
 Then start the dev server:
