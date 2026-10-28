@@ -25,11 +25,12 @@ interface TerminalPanelProps {
   isCollapsed: boolean;
   onToggle: () => void;
   isGenerating?: boolean;
+  isVerifying?: boolean;
   height?: number; // Height in pixels when not collapsed
   isResizing?: boolean; // Whether currently being resized
 }
 
-export function TerminalPanel({ isCollapsed, onToggle, isGenerating, height = 192, isResizing = false }: TerminalPanelProps) {
+export function TerminalPanel({ isCollapsed, onToggle, isGenerating, isVerifying = false, height = 192, isResizing = false }: TerminalPanelProps) {
   const { state, clearLogs, addLog } = useBlueprint();
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -64,9 +65,9 @@ export function TerminalPanel({ isCollapsed, onToggle, isGenerating, height = 19
           <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
           <span className="text-xs font-medium text-foreground">Terminal</span>
           <span className="text-xs text-muted-foreground">
-            — {isGenerating ? 'Generating...' : state.isVerifying ? 'Verifying...' : 'Output'}
+            — {isGenerating ? 'Generating...' : isVerifying ? 'Verifying...' : 'Output'}
           </span>
-          {(isGenerating || state.isVerifying) && (
+          {(isGenerating || isVerifying) && (
             <span className="h-2 w-2 animate-pulse rounded-full bg-primary" />
           )}
         </div>
@@ -110,7 +111,7 @@ export function TerminalPanel({ isCollapsed, onToggle, isGenerating, height = 19
           )}
 
           {/* Loading indicator */}
-          {(isGenerating || state.isVerifying) && (
+          {(isGenerating || isVerifying) && (
             <div className="flex gap-2 leading-5">
               <span className="shrink-0 text-muted-foreground/50">[...]</span>
               <span className="animate-pulse text-muted-foreground">

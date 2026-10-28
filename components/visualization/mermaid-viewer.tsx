@@ -6,7 +6,7 @@ import { ZoomIn, ZoomOut, Maximize2, Download, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-export interface Mermaid ViewerProps {
+export interface MermaidViewerProps {
     diagramCode: string;
     title?: string;
     onError?: (error: string) => void;

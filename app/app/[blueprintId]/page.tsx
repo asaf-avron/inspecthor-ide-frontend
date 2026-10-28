@@ -23,6 +23,11 @@ export default function BlueprintPage() {
   const params = useParams();
   const router = useRouter();
   const blueprintId = params?.blueprintId as string | undefined;
+  // The Proof Ledger and Component Health tabs call endpoints the backend does not expose yet
+  // (see the roadmap in the README), so they stay off unless explicitly enabled.
+  const brainUiEnabled = process.env.NEXT_PUBLIC_ENABLE_BRAIN_UI === 'true';
+  // Drift detection scans a checkout on the machine running the backend.
+  const localRepoPath = process.env.NEXT_PUBLIC_LOCAL_REPO_PATH;
 
   const {
     state: blueprintState,
@@ -380,6 +385,7 @@ export default function BlueprintPage() {
           isCollapsed={isTerminalCollapsed}
           onToggle={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
           isGenerating={blueprintState.isGenerating}
+          isVerifying={verificationState.isVerifying}
           height={isTerminalCollapsed ? undefined : terminalHeight}
           isResizing={isResizingTerminal}
         />
@@ -469,20 +475,24 @@ export default function BlueprintPage() {
                       <Sparkles className="h-3.5 w-3.5" />
                       Gemini Insight
                     </TabsTrigger>
-                    <TabsTrigger
-                      value="ledger"
-                      className="relative h-9 gap-1.5 rounded-none border-r border-border bg-transparent px-3 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground"
-                    >
-                      <Shield className="h-3.5 w-3.5" />
-                      Proof Ledger
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="drift"
-                      className="relative h-9 gap-1.5 rounded-none border-r border-border bg-transparent px-3 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground"
-                    >
-                      <Activity className="h-3.5 w-3.5" />
-                      Component Health
-                    </TabsTrigger>
+                    {brainUiEnabled && (
+                      <>
+                      <TabsTrigger
+                        value="ledger"
+                        className="relative h-9 gap-1.5 rounded-none border-r border-border bg-transparent px-3 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground"
+                      >
+                        <Shield className="h-3.5 w-3.5" />
+                        Proof Ledger
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="drift"
+                        className="relative h-9 gap-1.5 rounded-none border-r border-border bg-transparent px-3 text-xs data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=inactive]:text-muted-foreground"
+                      >
+                        <Activity className="h-3.5 w-3.5" />
+                        Component Health
+                      </TabsTrigger>
+                      </>
+                    )}
                   </TabsList>
                 </div>
                 <TabsContent value="verification" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
@@ -491,17 +501,26 @@ export default function BlueprintPage() {
                 <TabsContent value="gemini" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
                   <GeminiInsightPanel />
                 </TabsContent>
-                <TabsContent value="ledger" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
-                  <ProofLedgerPanel
-                    componentUuid={blueprintState.blueprintId || 'unknown'}
-                    componentName={blueprintState.name || 'Component'}
-                  />
-                </TabsContent>
-                <TabsContent value="drift" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
-                  <DriftDetectorPanel
-                    repoPath={repoPath || '/default/repo/path'}
-                  />
-                </TabsContent>
+                {brainUiEnabled && (
+                  <>
+                  <TabsContent value="ledger" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                    <ProofLedgerPanel
+                      componentUuid={blueprintState.blueprintId || 'unknown'}
+                      componentName={blueprintState.currentBlueprint?.name || 'Component'}
+                    />
+                  </TabsContent>
+                  <TabsContent value="drift" className="mt-0 flex-1 overflow-hidden data-[state=inactive]:hidden">
+                    {localRepoPath ? (
+                      <DriftDetectorPanel repoPath={localRepoPath} />
+                    ) : (
+                      <div className="p-4 text-sm text-muted-foreground">
+                        Drift detection scans a local checkout. Set NEXT_PUBLIC_LOCAL_REPO_PATH to the path of
+                        the repository on the machine that runs the backend.
+                      </div>
+                    )}
+                  </TabsContent>
+                  </>
+                )}
               </Tabs>
             </div>
           </div>
@@ -523,6 +542,7 @@ export default function BlueprintPage() {
         isCollapsed={isTerminalCollapsed}
         onToggle={() => setIsTerminalCollapsed(!isTerminalCollapsed)}
         isGenerating={blueprintState.isGenerating || blueprintState.isDeconstructing}
+        isVerifying={verificationState.isVerifying}
         height={isTerminalCollapsed ? undefined : terminalHeight}
         isResizing={isResizingTerminal}
       />
