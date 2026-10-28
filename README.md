@@ -48,7 +48,7 @@ Create `.env.local`:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_GUARDIAN_API_KEY=<one of ALLOWED_API_KEYS from the backend .env>
+NEXT_PUBLIC_INSPECTHOR_API_KEY=<one of ALLOWED_API_KEYS from the backend .env>
 ```
 
 Then start the dev server:

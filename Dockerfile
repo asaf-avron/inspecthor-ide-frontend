@@ -1,4 +1,4 @@
-# Frontend Dockerfile for Guardian Gateway IDE
+# Frontend Dockerfile for Inspecthor IDE
 FROM node:20-alpine AS base
 
 # Install dependencies only when needed
