@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Guardian Gateway - Light Mode Theme (Default) */
+/* Inspecthor - Light Mode Theme (Default) */
 :root {
   --background: oklch(0.98 0.002 260);
   --foreground: oklch(0.15 0.01 260);
@@ -59,7 +59,7 @@
   --syntax-operator: oklch(0.40 0.15 25);
 }
 
-/* Guardian Gateway - Dark Mode Theme */
+/* Inspecthor - Dark Mode Theme */
 .dark {
   --background: oklch(0.14 0.005 260);
   --foreground: oklch(0.95 0 0);

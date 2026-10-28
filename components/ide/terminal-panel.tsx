@@ -43,7 +43,7 @@ export function TerminalPanel({ isCollapsed, onToggle, isGenerating, height = 19
   // Add welcome message if no logs
   useEffect(() => {
     if (state.logs.length === 0 && state.hasBlueprint) {
-      addLog('info', 'Guardian Gateway IDE initialized');
+      addLog('info', 'Inspecthor IDE initialized');
       addLog('info', 'Ready for specification generation');
     }
   }, [state.hasBlueprint, state.logs.length, addLog]);
