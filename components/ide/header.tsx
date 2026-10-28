@@ -80,7 +80,7 @@ export function Header({
         <div className="flex items-center gap-1">
           <Image
             src={mounted && resolvedTheme === "dark" ? "/logo-dark.png" : "/logo.png"}
-            alt="Guardian Gateway Logo"
+            alt="Inspecthor Logo"
             width={64}
             height={64}
             className="h-12 w-12 object-contain"
