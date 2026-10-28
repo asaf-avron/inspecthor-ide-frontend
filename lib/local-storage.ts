@@ -36,7 +36,7 @@ export interface SyncQueueItem {
 }
 
 // === IndexedDB Schema ===
-interface GuardianDBSchema extends DBSchema {
+interface InspecthorDBSchema extends DBSchema {
     projects: {
         key: string;
         value: LocalProject;
@@ -54,16 +54,16 @@ interface GuardianDBSchema extends DBSchema {
     };
 }
 
-const DB_NAME = 'guardian-gateway';
+const DB_NAME = 'inspecthor';
 const DB_VERSION = 1;
 
-let db: IDBPDatabase<GuardianDBSchema> | null = null;
+let db: IDBPDatabase<InspecthorDBSchema> | null = null;
 
 // === Database Initialization ===
-async function getDB(): Promise<IDBPDatabase<GuardianDBSchema>> {
+async function getDB(): Promise<IDBPDatabase<InspecthorDBSchema>> {
     if (db) return db;
 
-    db = await openDB<GuardianDBSchema>(DB_NAME, DB_VERSION, {
+    db = await openDB<InspecthorDBSchema>(DB_NAME, DB_VERSION, {
         upgrade(db) {
             // Projects store
             const projectStore = db.createObjectStore('projects', { keyPath: 'id' });

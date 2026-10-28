@@ -19,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <title>Guardian Gateway - Formal Verification IDE</title>
+        <title>Inspecthor - Formal Verification IDE</title>
         <meta name="description" content="A modern IDE for formal verification and proof engineering" />
         <meta name="generator" content="v0.app" />
         <link rel="icon" href="/icon-light-32x32.png" media="(prefers-color-scheme: light)" />
